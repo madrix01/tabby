@@ -33,6 +33,17 @@
   @keyframes burst { from { transform:scale(.2); opacity:.95; } to { transform:scale(9); opacity:0; } }
   @keyframes up { to { transform:translateY(-60px); opacity:0; } }
 
+  /* emotions */
+  .emo  { font:800 15px var(--sans); text-anchor:middle; pointer-events:none; transform-box:fill-box; transform-origin:50% 50%; animation:emoUp 1.6s ease-out forwards; }   /* scale around itself, not the svg origin */
+  .rain { stroke:#7fb6e8; stroke-width:2; stroke-linecap:round; pointer-events:none; animation:rain .7s linear forwards; }
+  .tear { transform-box:fill-box; animation:tear 1.6s ease-in infinite; }
+  .chew { transform-box:fill-box; transform-origin:50% 50%; animation:chew .3s ease-in-out infinite alternate; }
+  @keyframes emoUp { 0% { transform:translate(0,0) scale(.6); opacity:0; } 15% { opacity:1; } 100% { transform:translate(var(--dx),-55px) scale(1.1); opacity:0; } }
+  @keyframes rain  { to { transform:translateY(34px); opacity:0; } }
+  @keyframes tear  { 0% { transform:translateY(0); opacity:0; } 20% { opacity:1; } 100% { transform:translateY(14px); opacity:0; } }
+  @keyframes chew  { to { transform:scaleY(.35); } }
+
+
   progress { width:200px; height:8px; accent-color:var(--red); }
   #xpinfo { min-width:100%; text-align:center; font-size:13px; letter-spacing:.04em; }
   #ui { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:760px; padding:0 12px; align-items:center; }
@@ -56,11 +67,14 @@
     <div id="name"></div>
     <div id="xpinfo"></div><div style="min-width:100%;text-align:center"><progress id="xp" max="1" value="0"></progress></div>
     <select id="species"></select>
+    <select id="evostage"></select>
     <select id="hat"></select>
     <select id="eyes"></select>
     <select id="neck"></select>
     <select id="prop"></select>
     <select id="gait"></select>
+    <select id="emotion"></select>
+    <button id="moods">Random moods</button>
     <label id="look"><input type="checkbox" id="glow"> Glow</label>
     <div id="glowcfg"></div>
     <button id="roll">Reroll this one</button>
@@ -117,7 +131,7 @@ function analyze(id){
     const ring = []; for (let k=0;k<n;k++){ const q = p.getPointAtLength(L*k/n); ring.push(N(q.x+tx, q.y+ty)); } pts.push(ring); }
   // ink parts: eyes are the upper ones, mouth the lower ones
   const ink = [...g.querySelectorAll('.k > *')].map((el, idx) => { const b = el.getBBox(), [tx,ty] = translateOf(el), [x0,y0] = N(b.x+tx, b.y+ty), [x1,y1] = N(b.x+b.width+tx, b.y+b.height+ty);
-    return { idx, cx:(x0+x1)/2, cy:(y0+y1)/2, r:Math.max(x1-x0, y1-y0)/2, bottom:y1 }; });
+    return { idx, cx:(x0+x1)/2, cy:(y0+y1)/2, r:Math.max(x1-x0, y1-y0)/2, bottom:y1, w:x1-x0 }; });
   let eyes = ink, mouth = [];
   if (ink.length === 2 && Math.abs(ink[0].cy-ink[1].cy) > Math.abs(ink[0].cx-ink[1].cx)*.8) { const [a,b] = [...ink].sort((p,q)=>p.cy-q.cy); eyes = [a]; mouth = [b]; }
   else if (ink.length >= 3) { const ys = ink.map(e=>e.cy), mid = (Math.min(...ys)+Math.max(...ys))/2; eyes = ink.filter(e=>e.cy < mid); mouth = ink.filter(e=>e.cy >= mid); }
@@ -146,7 +160,9 @@ function analyze(id){
   // neck: under the mouth (or well under a lone eye), centred on the body there
   const mouthBottom = mouth.length ? Math.max(...mouth.map(m=>m.bottom)) : ec[1] + Math.max(eyeR*4, H*.12);
   const neckY = Math.min(mouthBottom + Math.max(4, eyeR*1.3), -H*.15), neckS = spanAt(neckY, ec[0]);
-  return ANCH[id] = { s0, cx, bot, W, H, eye:ec, span, angle, eyeR, eyeIdx:eyes.map(e=>e.idx), hat, headS, headW, neck:[clamp(mid(neckS), ec[0] - headW*.2, ec[0] + headW*.2), neckY], neckW:len(neckS), side:[W/2 - 4, 0] };
+  const mouthC = mouth.length ? [mouth.reduce((a,m)=>a+m.cx,0)/mouth.length, mouth.reduce((a,m)=>a+m.cy,0)/mouth.length] : [ec[0], ec[1] + Math.max(eyeR*3.2, 9)];
+  const mouthW = mouth.length ? Math.max(...mouth.map(m=>m.w)) : Math.max(span*.5, 10);
+  return ANCH[id] = { s0, cx, bot, W, H, eye:ec, eyes:eyes.map(e=>[e.cx, e.cy]), span, angle, eyeR, eyeIdx:eyes.map(e=>e.idx), mouthIdx:mouth.map(m=>m.idx), mouthC, mouthW, hat, headS, headW, neck:[clamp(mid(neckS), ec[0] - headW*.2, ec[0] + headW*.2), neckY], neckW:len(neckS), side:[W/2 - 4, 0] };
 }
 
 // ---------- attachments: each slot has one anchor + one size rule; every item is drawn 100 wide around its marker m ----------
@@ -171,6 +187,7 @@ const ITEMS = {
     Goggles: { draw: A => lenses(A, 1.25, (x,r) => `<circle cx="${x}" cy="0" r="${r}" fill="#8fd3ff" stroke="#e8494b" stroke-width="${r*.32}"/><path d="M${x-r*.45} ${-r*.35} q${r*.3} ${-r*.3} ${r*.65} ${-r*.2}" stroke="#fff" stroke-width="${r*.18}" stroke-linecap="round" fill="none"/>`, '#e8494b', true) },
     Shades:  { draw: A => lenses(A, 1.15, (x,r) => `<rect x="${x-r*1.1}" y="${-r*.75}" width="${r*2.2}" height="${r*1.5}" rx="${r*.45}" fill="#2b2a33"/><path d="M${x-r*.6} ${-r*.3} h${r*.5}" stroke="#fff" stroke-width="${r*.15}" stroke-linecap="round" opacity=".6"/>`, '#2b2a33') },
     Round:   { draw: A => lenses(A, 1.05, (x,r) => `<circle cx="${x}" cy="0" r="${r}" fill="#ffffff55" stroke="#2b2a33" stroke-width="${r*.26}"/>`, '#2b2a33') },
+    ThreeD:  { draw: A => lenses(A, 1.15, (x,r) => `<rect x="${x-r*1.1}" y="${-r*.75}" width="${r*2.2}" height="${r*1.5}" rx="${r*.3}" fill="${x > 0 ? '#3a85f2' : '#e8494b'}" fill-opacity=".85" stroke="#f4f1ea" stroke-width="${r*.3}"/>`, '#f4f1ea') },   // red left, blue right
     Hearts:  { draw: A => lenses(A, 1.2,  (x,r) => `<path transform="translate(${x} ${-r*.15}) scale(${r/18})" d="M0 18 C-30 -2 -16 -22 0 -8 C16 -22 30 -2 0 18Z" fill="#f2679b"/>`, '#f2679b') },
   },
   neck: {
@@ -257,11 +274,67 @@ function glowParts(i, c, A){
   return { defs, skin, gloss, glint, shadow, into, halo: g.halo > 0 && g.blur > 0 };
 }
 
+// ---------- emotions: a face (mouth, brows, cheeks, tear), idle body motion, floating particles,
+// and a thought bubble / cloud / ground item that says what the critter is up to ----------
+const EMOTIONS = ['happy','sad','food','entertainment','travel','shopping'];
+const EMO = {
+  happy:         { mouth:'grin',  cheeks:true, motion:{ jump:7, freq:1.8, sway:3, squash:.08 }, fx:{ every:500, glyphs:['✦','♥','✦'], colors:['#f6c945','#f2679b','#ffb800'] } },
+  sad:           { mouth:'frown', brows:true, tear:true, cloud:true, motion:{ slump:.07, lean:-3, freq:.5, sway:1.5 }, fx:{ every:160, rain:true } },
+  food:          { mouth:'chew',  bubble:'burger', motion:{ jump:1.5, freq:1.4, sway:2, squash:.03 }, fx:{ every:900, glyphs:['nom','yum'], colors:['#c9714e','#e8494b'] } },
+  entertainment: { mouth:'grin',  bubble:'popcorn', eyes:'ThreeD', motion:{ jump:6, freq:1.1, sway:11, squash:.06 }, fx:{ every:420, glyphs:['♪','♫'], colors:['#3a85f2','#e8494b','#16b79d','#8c6fd6'] } },
+  travel:        { mouth:'smile', bubble:'plane', ground:'suitcase', motion:{ jump:3, freq:1.3, sway:4, lean:3, squash:.03 }, fx:{ every:1400, glyphs:['✈'], colors:['#3a85f2'] } },
+  shopping:      { mouth:'open',  bubble:'bag', ground:'bags', motion:{ jump:5, freq:2.2, sway:2, squash:.06 }, fx:{ every:520, glyphs:['$','%','$'], colors:['#2f9e44','#e8494b','#e0a800'] } },
+};
+const INK = '#2b2a33';
+const ICONS = {   // ~24 units, centred on 0,0
+  burger:  `<path d="M-11 -1 Q-11 -11 0 -11 Q11 -11 11 -1Z" fill="#f0a64a"/><circle cx="-4" cy="-7" r=".9" fill="#fff4d6"/><circle cx="3" cy="-8" r=".9" fill="#fff4d6"/><rect x="-12" y="-1" width="24" height="3" rx="1.5" fill="#7cc23c"/><rect x="-11" y="2" width="22" height="4" rx="2" fill="#8a4b2f"/><path d="M-11 6 H11 Q11 10 0 10 Q-11 10 -11 6Z" fill="#f0a64a"/>`,
+  popcorn: `<circle cx="-5" cy="-5" r="4" fill="#fff1b8"/><circle cx="1" cy="-7" r="4.4" fill="#fffbe6"/><circle cx="6" cy="-4" r="3.8" fill="#fff1b8"/><path d="M-9 -2 L9 -2 L6 12 L-6 12Z" fill="#fff"/><path d="M-5 -2 L-4 12 M0 -2 V12 M5 -2 L4 12" stroke="#e8494b" stroke-width="2.4"/>`,
+  plane:   `<path d="M-12 3 L11 -3 Q15 -4 14 -1 L-9 6Z" fill="#3a85f2"/><path d="M-1 1 L-7 -9 L-3 -9 L5 -1Z" fill="#2f6fd0"/><path d="M-9 4 L-13 -2 L-11 -2 L-6 3Z" fill="#2f6fd0"/>`,
+  bag:     `<path d="M-9 -4 H9 L10 11 H-10Z" fill="#f2679b"/><path d="M-5 -4 Q-5 -11 0 -11 Q5 -11 5 -4" stroke="#c94d7f" stroke-width="2" fill="none"/>`,
+};
+const GROUND_ITEMS = {   // stand on the ground, drawn leftwards from (0,0)
+  suitcase: `<rect x="-32" y="-24" width="32" height="22" rx="4" fill="#c9714e"/><path d="M-21 -24 V-29 H-11 V-24" stroke="#8a4b2f" stroke-width="2.5" fill="none"/><path d="M-32 -14 H0" stroke="#8a4b2f" stroke-width="2"/><rect x="-14" y="-21" width="8" height="5" rx="1" fill="#f6c945"/><circle cx="-27" cy="-1" r="2.5" fill="#555"/><circle cx="-5" cy="-1" r="2.5" fill="#555"/>`,
+  bags:     `<path d="M-38 -24 H-20 L-18 0 H-40Z" fill="#3a85f2"/><path d="M-34 -24 Q-34 -32 -29 -32 Q-24 -32 -24 -24" stroke="#2f6fd0" stroke-width="2" fill="none"/><path d="M-22 -18 H-2 L0 0 H-24Z" fill="#f2679b"/><path d="M-17 -18 Q-17 -26 -12 -26 Q-7 -26 -7 -18" stroke="#c94d7f" stroke-width="2" fill="none"/><text x="-12" y="-6" font-size="9" font-weight="800" text-anchor="middle" fill="#fff">%</text>`,
+};
+function emoMouth(kind, A){
+  // headW can under-measure on multi-part bodies, hence the 14 floor
+  const w = clamp(A.mouthW*1.1, 9, Math.max(14, A.headW*.42)), [x, y] = A.mouthC, sw = Math.max(2, w*.13).toFixed(1), h = w/2;
+  const at = inner => `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})">${inner}</g>`;
+  return at({
+    grin:  `<path d="M${-h} ${-w*.1} Q0 ${w*.75} ${h} ${-w*.1}Z" fill="${INK}"/><path d="M${-h*.6} ${-w*.02} H${h*.6}" stroke="#fff" stroke-width="${(w*.1).toFixed(1)}" stroke-linecap="round"/><ellipse cx="0" cy="${w*.3}" rx="${w*.2}" ry="${w*.1}" fill="#f0788e"/>`,
+    smile: `<path d="M${-h*.8} 0 Q0 ${w*.5} ${h*.8} 0" stroke="${INK}" stroke-width="${sw}" stroke-linecap="round" fill="none"/>`,
+    frown: `<path d="M${-h*.75} ${w*.22} Q0 ${-w*.2} ${h*.75} ${w*.22}" stroke="${INK}" stroke-width="${sw}" stroke-linecap="round" fill="none"/>`,
+    open:  `<ellipse cx="0" cy="${w*.08}" rx="${w*.3}" ry="${w*.36}" fill="${INK}"/><ellipse cx="0" cy="${w*.28}" rx="${w*.18}" ry="${w*.1}" fill="#f0788e"/>`,
+    chew:  `<ellipse class="chew" cx="0" cy="0" rx="${w*.34}" ry="${w*.24}" fill="${INK}"/>`,
+  }[kind]);
+}
+function emoFace(e, A){
+  const r = A.eyeR, out = [emoMouth(e.mouth, A)];
+  if (e.brows) for (const [x, y] of A.eyes) { const s = x >= A.eye[0] ? 1 : -1;     // worried brows: inner ends raised
+    out.push(`<path d="M${(x + s*r*1.6).toFixed(1)} ${(y - r*2).toFixed(1)} L${(x - s*r*1.2).toFixed(1)} ${(y - r*3.2).toFixed(1)}" stroke="${INK}" stroke-width="${Math.max(1.8, r*.7).toFixed(1)}" stroke-linecap="round"/>`); }
+  if (e.tear && A.eyes.length) { const [x, y] = A.eyes[A.eyes.length - 1];
+    out.push(`<path class="tear" d="M${x} ${y + r*1.4} q${-r*.9} ${r*1.6} 0 ${r*2.2} q${r*.9} ${-r*.6} 0 ${-r*2.2}Z" fill="#6cc4ff"/>`); }
+  if (e.cheeks) for (const [x, y] of A.eyes) out.push(`<ellipse cx="${(x + (x - A.eye[0])*.25).toFixed(1)}" cy="${(y + r*2.3).toFixed(1)}" rx="${(r*1.5).toFixed(1)}" ry="${(r*.85).toFixed(1)}" fill="#ff7fa5" opacity=".45"/>`);
+  return out.join('');
+}
+// where the bubble / cloud sit in character space (also used to spawn particles)
+const emoSpots = (A, hat) => { const lift = hat ? A.hat.w*.7 : 0;   // clear the hat if one is worn
+  return { bubble:[A.W*.42 + 12, A.hat.at[1] - 12], cloud:[A.eye[0], A.hat.at[1] - 34 - lift], top:[A.eye[0], A.hat.at[1] - 8 - lift] }; };
+function emoExtras(e, A, hat){
+  const sp = emoSpots(A, hat), out = [];
+  if (e.bubble) { const [x, y] = sp.bubble;
+    out.push(`<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><circle cx="-14" cy="20" r="2.5" fill="#fff" stroke="#d7d3cc" stroke-width="1.5"/><circle cx="-8" cy="13" r="3.5" fill="#fff" stroke="#d7d3cc" stroke-width="1.5"/><circle r="17" fill="#fff" stroke="#d7d3cc" stroke-width="2"/>${ICONS[e.bubble]}</g>`); }
+  if (e.cloud) { const [x, y] = sp.cloud;
+    out.push(`<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><circle cx="-10" cy="2" r="8" fill="#9aa3ad"/><circle cx="0" cy="-3" r="10" fill="#9aa3ad"/><circle cx="11" cy="2" r="8" fill="#9aa3ad"/><rect x="-18" y="2" width="37" height="8" rx="4" fill="#9aa3ad"/></g>`); }
+  if (e.ground) out.push(`<g transform="translate(${(-A.W/2 + 2).toFixed(1)} 0)">${GROUND_ITEMS[e.ground]}</g>`);
+  return out.join('');
+}
+
 function petSVG(p, i){
   const sp = SPECIES[p.species], t = Growth.traits(p.xp, sp.forms, p.form), f = t.form, c = CHARS[f.id], A = analyze(f.id);
-  const G = glow ? glowParts(i, c, A) : null;
-  const ink = c.ink.map((e, k) => A.eyeIdx.includes(k) ? `<g class="eye">${e}${G ? G.glint(e) : ''}</g>` : e).join('');     // eyes wrapped so blinking doesn't fight their translate
-  const items = `${attachment('neck', p.neck, A)}${attachment('eyes', p.eyes, A)}${attachment('hat', p.hat, A)}`;
+  const G = glow ? glowParts(i, c, A) : null, E = EMO[p.emotion];
+  const ink = c.ink.map((e, k) => A.eyeIdx.includes(k) ? `<g class="eye">${e}${G ? G.glint(e) : ''}</g>` : E && A.mouthIdx.includes(k) ? '' : e).join('');   // an emotion draws its own mouth     // eyes wrapped so blinking doesn't fight their translate
+  const items = `${attachment('neck', p.neck, A)}${attachment('eyes', E?.eyes || p.eyes, A)}${attachment('hat', p.hat, A)}`;   // a mood can put on its own eyewear
   const skin = G ? G.skin : c.skin.join('');
   return `<g class="pet ${p.likesPets?'likes':'hates'} ${evo[i]?'evolving':''}" data-i="${i}" transform="translate(${pos[i]} ${GROUND})">
     ${G ? `<defs>${G.defs}</defs>` : ''}
@@ -271,8 +344,10 @@ function petSVG(p, i){
         ${G?.halo ? `<g filter="url(#halo${i})"><g transform="${G.into}">${skin}</g>${items}</g>` : ''}
         <g transform="scale(${A.s0}) translate(${-A.cx} ${-A.bot})">${skin}${ink}</g>
         ${G ? G.gloss : ''}
+        ${E ? emoFace(E, A) : ''}
         ${items}
       </g>
+      ${E ? emoExtras(E, A, p.hat) : ''}
       ${p.prop ? `<g class="prop">${attachment('prop', p.prop, A)}</g>` : ''}
     </g></g>
     <text class="label" y="26">${f.name}</text>
@@ -296,8 +371,10 @@ function render(){
     (none ? `<option value="">${none}</option>` : '') + vals.map(([v, txt]) => `<option value="${v}" ${String(v)===String(cur)?'selected':''}>${label(txt)}</option>`).join('');
   document.getElementById('name').textContent = SPECIES[p.species].forms[p.form].name + (p.likesPets ? ' · loves pets' : ' · hates pets');
   opts('species', SPECIES.map((s,k) => [k, s.name]), p.species);
+  opts('evostage', SPECIES[p.species].forms.map((f,k) => [k, `${k + 1}. ${f.name} (Lv ${f.at})`]), p.form, '', v => 'stage ' + v);
   for (const slot of ['hat','eyes','neck','prop']) opts(slot, Object.keys(ITEMS[slot]).map(v => [v, v.replace(/([a-z])([A-Z])/g,'$1 $2')]), p[slot], `no ${slot}`);
   opts('gait', GAIT_NAMES.map(v => [v, v]), p.gait, '', v => 'walk: ' + v);
+  opts('emotion', EMOTIONS.map(v => [v, v]), p.emotion || '', 'mood: none', v => 'mood: ' + v);
   save();
 }
 
@@ -318,6 +395,13 @@ function pose(i, dt, t){
   lean = g.sway*k*S(TAU*ph) + dr*g.lean*k;
   if (hov && p.likesPets) { const b = S(TAU*2.8*t); sy *= 1 + .07*b; sx *= 1 - .04*b; }
   if (hov && !p.likesPets) lean += 3*S(t*55);
+  const em = !busy && EMO[p.emotion]?.motion;
+  if (em) {                                   // emotion body language while standing (fades out when walking/dancing)
+    const q = 1 - k; a.eph = (a.eph || 0) + dt*(em.freq || 1); const st = Math.abs(S(TAU*a.eph)), l2 = Math.pow(1 - st, 6)*q*(em.squash || 0);
+    by -= (em.jump || 0)*q*st; lean += (em.sway || 0)*q*S(TAU*a.eph) + (em.lean || 0)*q;
+    sy *= 1 - l2 + (em.squash || 0)*.5*q*st; sx *= 1 + l2*.8;
+    if (em.slump) { sy *= 1 - em.slump*q; sx *= 1 + em.slump*.6*q; }
+  }
   if (a.hop > 0) { const pp = 1 - a.hop/.6, air = S(Math.PI*pp); by -= 26*air; sy *= 1 + .08*air; sx *= 1 - .05*air; a.hop -= dt; }
   return { by, lean, sx, sy, flip: m === 'walk' || m === 'home' ? dr : 1 };
 }
@@ -332,7 +416,22 @@ function applyPose(i, P){
 const g = i => svg.querySelector(`.pet[data-i="${i}"]`);
 function blink(i){ const el = g(i); if (el) { el.classList.add('blink'); setTimeout(() => el.classList.remove('blink'), 150); } setTimeout(() => blink(i), 600 + Math.random()*3500); }
 pets.forEach((_,i) => setTimeout(() => blink(i), Math.random()*2000));
-setInterval(() => { const i = rnd(5); if (!hover.has(i) && mode[i]==='idle' && !evo[i]) hop(i); }, 2500);
+setInterval(() => { const i = rnd(5); if (!hover.has(i) && mode[i]==='idle' && !evo[i] && pets[i].emotion !== 'sad') hop(i); }, 2500);
+// emotion particles: sparkles, notes, $ tags, rain from the cloud...
+const emoClock = [];
+setInterval(() => {
+  pets.forEach((p, i) => { const e = EMO[p.emotion]; if (!e || evo[i] || !refs[i]) return;
+    emoClock[i] = (emoClock[i] || 0) + 100; if (emoClock[i] < e.fx.every) return; emoClock[i] = 0;
+    const A = analyze(SPECIES[p.species].forms[p.form].id), sc = Growth.traits(p.xp, SPECIES[p.species].forms, p.form).scale, sp = emoSpots(A, p.hat);
+    const X = v => pos[i] + v*sc, Y = v => GROUND + v*sc;
+    if (e.fx.rain) { const l = document.createElementNS(NS,'line'), x = X(sp.cloud[0] + (Math.random()*28 - 14)), y = Y(sp.cloud[1] + 10);
+      l.setAttribute('class','rain'); l.setAttribute('x1',x); l.setAttribute('x2',x); l.setAttribute('y1',y); l.setAttribute('y2',y + 6); svg.append(l); setTimeout(() => l.remove(), 700); return; }
+    const t = document.createElementNS(NS,'text'), k = rnd(e.fx.glyphs.length);
+    t.textContent = e.fx.glyphs[k]; t.setAttribute('class','emo'); t.setAttribute('fill', e.fx.colors[k % e.fx.colors.length]);
+    t.setAttribute('x', X(sp.top[0] + (Math.random()*.6 - .3)*A.W)); t.setAttribute('y', Y(sp.top[1])); t.style.setProperty('--dx', (Math.random()*30 - 15) + 'px');
+    svg.append(t); setTimeout(() => t.remove(), 1600);
+  });
+}, 100);
 function startHearts(i){
   clearInterval(hearts[i]);
   if (!pets[i].likesPets) return;
@@ -406,6 +505,10 @@ document.getElementById('stop').onclick     = () => { mode.forEach((m,i)=>mode[i
 // ---------- ui ----------
 document.getElementById('roll').onclick    = () => { pets[sel] = { ...pets[sel], ...roll() }; render(); };
 document.getElementById('rollAll').onclick = () => { pets = pets.map(p => ({ ...p, ...roll() })); render(); };
+// jump straight to an evolution stage: xp is set to that stage's unlock level so it doesn't evolve straight back
+document.getElementById('evostage').onchange = e => { const k = +e.target.value, f = SPECIES[pets[sel].species].forms[k];
+  if (evo[sel]) return; pets[sel] = { ...pets[sel], form:k, xp:Math.ceil(Growth.xpForLevel(f.at)) }; render();
+  g(sel)?.classList.add('pop'); setTimeout(() => g(sel)?.classList.remove('pop'), 1000); };
 document.getElementById('species').onchange = e => { const s = +e.target.value; pets[sel] = { ...pets[sel], species:s, form:Growth.traits(pets[sel].xp, SPECIES[s].forms).earned }; render(); };
 const glowBox = document.getElementById('glow');
 const applyLook = () => { document.body.classList.toggle('glow', glow); glowBox.checked = glow; };
@@ -425,7 +528,8 @@ function glowUI(){
   box.querySelector('#glowreset').onclick = () => { for (const [k,[d]] of Object.entries(GLOW_KNOBS)) glowCfg[k] = d; glowCfg.color = ''; saveCfg(); glowUI(); };
 }
 glowUI();
-for (const k of ['hat','eyes','neck','prop','gait']) document.getElementById(k).onchange = e => { pets[sel][k] = e.target.value; render(); };
+document.getElementById('moods').onclick = () => { pets.forEach(p => p.emotion = pick(EMOTIONS)); render(); };
+for (const k of ['hat','eyes','neck','prop','gait','emotion']) document.getElementById(k).onchange = e => { pets[sel][k] = e.target.value; render(); };
 render();
 </script>
 </body>
