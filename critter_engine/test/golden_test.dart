@@ -65,6 +65,24 @@ void main() {
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/gallery_v4.png'));
   });
 
+  testWidgets('gallery: v6 frens, unisex flat and cute glow', (tester) async {
+    tester.view.physicalSize = const Size(1400, 1650);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    Widget fren(String species, int form, CritterLook look) => CritterView(catalog: catalog, look: look, spec: CritterSpec(species: species, form: form));
+    await tester.pumpWidget(MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Column(children: [
+        Expanded(child: ColoredBox(color: const Color(0xfffbf8f2), child: GridView.count(crossAxisCount: 7, childAspectRatio: 4 / 3, padding: const EdgeInsets.all(4),
+            children: [for (final s in catalog.speciesIn('v6').take(4)) for (var f = 0; f < 7; f++) fren(s.id, f, CritterLook.flat)]))),
+        Expanded(child: ColoredBox(color: const Color(0xff1a1512), child: GridView.count(crossAxisCount: 7, childAspectRatio: 4 / 3, padding: const EdgeInsets.all(4),
+            children: [for (final s in catalog.speciesIn('v6_cute').skip(4)) for (var f = 0; f < 7; f++) fren(s.id, f, CritterLook.glow)]))),
+      ]),
+    ));
+    await settle(tester);
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/gallery_v6.png'));
+  });
+
   testWidgets('v4 moods', (tester) async {
     tester.view.physicalSize = const Size(1750, 330);
     tester.view.devicePixelRatio = 1;

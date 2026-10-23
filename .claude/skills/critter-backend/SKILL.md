@@ -1,6 +1,6 @@
 ---
 name: critter-backend
-description: Backend contract for the critter pets rendered by the critter_engine Flutter app (github.com/madrix01/tabby). Use when building, validating or reviewing any JSON a backend sends to the frontend about critters/blobs/pets — the critter spec (species, form/evolution stage, xp, attachments, mood incl. empty_wallet, look/glow), custom item definitions (hats, eyewear, neck items, props as SVG), the item store list, or the money transfer (send money) payload — and when you need the valid slugs for species (v3 and v4 sets), forms, items, moods or looks, or the xp-to-level/evolution math.
+description: Backend contract for the critter pets rendered by the critter_engine Flutter app (github.com/madrix01/tabby). Use when building, validating or reviewing any JSON a backend sends to the frontend about critters/blobs/pets — the critter spec (species, form/evolution stage, xp, attachments, mood incl. empty_wallet, look/glow), custom item definitions (hats, eyewear, neck items, props as SVG), the item store list, or the money transfer (send money) payload — and when you need the valid slugs for species (v3, v4 and v6 frens sets), forms, items, moods or looks, or the xp-to-level/evolution math.
 ---
 
 # Critter backend contract
@@ -61,7 +61,7 @@ Smallest valid payload: `{ "species": "blip" }`.
 
 ## 3. Custom item definition (B) and item list (C)
 
-The app places any item on any of its 86 characters (both sets) automatically, from that character's measured eyes, head and neck. Never send per-character positions.
+The app places any item on any of its 198 characters (all sets) automatically, from that character's measured eyes, head and neck. Never send per-character positions.
 
 ```json
 { "id": "viking", "slot": "hat",  "anchor": [50, 60], "svg": "<path d='M10 60 Q10 20 50 20 Q90 20 90 60Z' fill='#9aa0a6'/>" }
@@ -90,7 +90,7 @@ The app places any item on any of its 86 characters (both sets) automatically, f
 
 ## 4. Species slugs and evolution stages
 
-Each species is an evolution line. `form` is the index into its stages. There are two art sets, **v3** (16 lines below) and **v4** (13 lines in the second table). They are just more species slugs: mix them freely in any payload, including a money transfer from a v3 critter to a v4 one. The set never has to be sent.
+Each species is an evolution line. `form` is the index into its stages. There are four art sets: **v3** (16 lines), **v4** (13 lines) and the **v6** frens in a unisex and a cute set (8 lines each). They are just more species slugs: mix them freely in any payload, including a money transfer from a v3 critter to a v4 one. The set never has to be sent.
 
 #### v3 set
 | `species` | form 0 | form 1 | form 2 | form 3 | max `form` |
@@ -128,6 +128,16 @@ Each species is an evolution line. `form` is the index into its stages. There ar
 | `bean` | Bean | Stripey (Lv 4) | Plank (Lv 8) | | 2 |
 | `puffin` | Puffin | Boxy (Lv 4) | Rowan (Lv 8) | | 2 |
 | `speckle` | Speckle | Dotty (Lv 4) | Crag (Lv 8) | | 2 |
+
+#### v6 frens (unisex `v6_<fren>`, cute `v6_cute_<fren>`)
+`<fren>` is one of bloop, mochi, puff, pup, berry, pickle, chiku, bun, so 16 slugs: `v6_bloop` … `v6_bun` and `v6_cute_bloop` … `v6_cute_bun`. Every fren has 7 stages, max `form` 6:
+
+| form | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|---|
+| stage | Egg | Hatchling | Baby | Kid | Teen | Grown | Legend |
+| unlocks at | Lv 1 | Lv 2 | Lv 3 | Lv 5 | Lv 7 | Lv 10 | Lv 14 |
+
+Lv 2 is 30 xp, Lv 3 85, Lv 5 240, Lv 7 441, Lv 10 810 and Lv 14 **1406**. Source art: `frens-svgs/<unisex|cute>/flat/<fren>/<fren>-<form>-<stage>.svg`; `docs/evolution_sheet_v6.svg` and `_v6_cute.svg` show them.
 
 `bean` is the v4 species; "Bean" is also the display name of form 1 of the v3 `pip` line. Display names are never sent, so they don't clash.
 
@@ -177,11 +187,12 @@ Evolution thresholds: Lv 4 is **156** xp, Lv 8 is **556**, Lv 6 is **336**, Lv 3
 
 ```python
 import math
-UNLOCKS = {"squidge": [1, 3, 6, 10], "tock": [1, 3, 6, 10], "radish": [1, 6], "stamp": [1, 6], "snowy": [1, 6]}   # every other species (both sets): [1, 4, 8]
+UNLOCKS = {"squidge": [1, 3, 6, 10], "tock": [1, 3, 6, 10], "radish": [1, 6], "stamp": [1, 6], "snowy": [1, 6]}   # v6_* frens: [1, 2, 3, 5, 7, 10, 14]; every other species: [1, 4, 8]
 def level(xp): return 1 + math.floor((max(0, xp) / 30) ** (1 / 1.5) + 1e-9)
 def form_for(species, xp):
     lv = level(xp)
-    return max(i for i, at in enumerate(UNLOCKS.get(species, [1, 4, 8])) if at <= lv)
+    unlocks = [1, 2, 3, 5, 7, 10, 14] if species.startswith("v6_") else UNLOCKS.get(species, [1, 4, 8])
+    return max(i for i, at in enumerate(unlocks) if at <= lv)
 ```
 
 When a user's xp crosses a threshold, send the new `form`. The app currently just renders the new stage. The planned evolution animation will play when `form` goes up compared with what the app last showed, so make sure you always send the current form.

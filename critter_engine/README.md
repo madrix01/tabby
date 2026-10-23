@@ -2,7 +2,7 @@
 
 Renders a critter (character + attachments) from a JSON spec. The geometry comes from `assets/critter_catalog.json`, which `../compiler` builds (`npm run build` writes it straight into this package).
 
-The catalog holds two art sets that work side by side: **v3** (16 lines, `characters/`) and **v4** (13 lines of textured shapes with eye whites and legs, `shapes_v4/`). A spec only names a species, so any mix is fine, including a money transfer from a v3 critter to a v4 one. `catalog.speciesIn('v4')` lists one set.
+The catalog holds art sets that work side by side: **v3** (16 lines, `characters/`), **v4** (13 lines of textured shapes with eye whites and legs, `shapes_v4/`) and the **v6** frens (`v6_<fren>` and `v6_cute_<fren>`, 7 stages each, `frens-svgs/`). A spec only names a species, so any mix is fine, including a money transfer from a v3 critter to a v4 one. `catalog.speciesIn('v4')` lists one set (`v3`, `v4`, `v6`, `v6_cute`).
 
 ```dart
 final catalog = await CritterCatalog.load();                 // once

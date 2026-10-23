@@ -1,4 +1,4 @@
-// Catalog compiler: ../characters/*.svg (v3 set) + ../shapes_v4/*.svg (v4 set, see v4.mjs) + items.mjs -> out/critter_catalog.json (+ out/gallery.html for eyeballing).
+// Catalog compiler: ../characters/*.svg (v3 set) + ../shapes_v4/*.svg (v4 set, see v4.mjs) + ../frens-svgs/*/flat (v6 sets) + items.mjs -> out/critter_catalog.json (+ out/gallery.html for eyeballing).
 // All geometry is measured here once, so the app only composes strings and animates. Port of analyze() in v3/index.html.
 //   node compile.mjs
 import fs from 'node:fs';
@@ -6,19 +6,19 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import svgpath from 'svgpath';
 import { svgPathProperties } from 'svg-path-properties';
-import { HATS, NECK, PROPS, EYEWEAR, LINES, LINES_V4, LEVELS, SIZES } from './items.mjs';
+import { HATS, NECK, PROPS, EYEWEAR, LINES, LINES_V4, FRENS, FREN_STAGES, LEVELS, SIZES } from './items.mjs';
 import { buildV4 } from './v4.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.join(HERE, '..', 'characters'), OUT = path.join(HERE, 'out');
-const INK = '#2b2a33', VERSION = 2;   // 2: v4 characters (clips, stroked legs, coloured eye parts) and species collections
+const INK = '#2b2a33', VERSION = 2;   // 2: v4 characters (clips, stroked legs, coloured eye parts) and species collections (v3, v4, v6, v6_cute)
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const r2 = n => Math.round(n * 100) / 100;
 
 // ---------- parse the traced SVGs (flat: <path> / <circle> with fill + optional translate) ----------
 const attr = (a, k) => (new RegExp(`\\b${k}="([^"]*)"`).exec(a) || [])[1];
 const translateOf = a => { const m = /translate\(([-\d.]+)[ ,]+([-\d.]+)\)/.exec(attr(a, 'transform') || ''); return m ? [+m[1], +m[2]] : [0, 0]; };
-function parse(file){
+function parse(file, id = /character_(\d+)/.exec(file)[1]){
   const s = fs.readFileSync(file, 'utf8'), els = [];
   for (const [, tag, a] of s.matchAll(/<(path|circle)\b([^>]*?)\/?>/g)) {
     const fill = attr(a, 'fill');
@@ -27,7 +27,7 @@ function parse(file){
       ? { tag, fill, d: attr(a, 'd'), t: translateOf(a), rule: attr(a, 'fill-rule') }
       : { tag, fill, cx: +attr(a, 'cx'), cy: +attr(a, 'cy'), r: +attr(a, 'r') });
   }
-  return { id: /character_(\d+)/.exec(file)[1], skin: els.filter(e => e.fill !== INK), ink: els.filter(e => e.fill === INK) };
+  return { id, skin: els.filter(e => e.fill !== INK), ink: els.filter(e => e.fill === INK) };
 }
 const sample = (e, n) => { const p = new svgPathProperties(e.d), L = p.getTotalLength();
   return Array.from({ length: n }, (_, k) => { const q = p.getPointAtLength(L * k / n); return [q.x + e.t[0], q.y + e.t[1]]; }); };
@@ -35,10 +35,11 @@ const bboxOf = pts => { const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
   return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) }; };
 
 // ---------- measure one character: normalise (feet at origin, ~100 tall) and find eyes, hat seat, neck, side ----------
-function analyze(c){
+// fixed: { s0, cx, bot } keeps art that is already drawn feet-at-origin at its own scale (the frens grow stage by stage in the art itself)
+function analyze(c, fixed){
   const raw = c.skin.filter(e => e.tag === 'path').map(e => sample(e, 600));
   const bb = bboxOf(raw.flat()), bw = bb.x1 - bb.x0, bh = bb.y1 - bb.y0;
-  const s0 = Math.min(100 / bh, 150 / bw), cx = (bb.x0 + bb.x1) / 2, bot = bb.y1;
+  const s0 = fixed?.s0 ?? Math.min(100 / bh, 150 / bw), cx = fixed?.cx ?? (bb.x0 + bb.x1) / 2, bot = fixed?.bot ?? bb.y1;
   const N = ([x, y]) => [(x - cx) * s0, (y - bot) * s0];
   const pts = raw.map(ring => ring.map(N)), all = pts.flat();
   // ink parts: eyes are the upper ones, mouth the lower ones
@@ -109,10 +110,9 @@ function attachments(A){
 // ---------- build ----------
 const files = fs.readdirSync(SRC).filter(f => /^character_\d+\.svg$/.test(f)).sort();
 const characters = {};
-for (const file of files) {
-  const c = parse(path.join(SRC, file)), A = analyze(c);
-  const norm = e => svgpath(e.d).translate(e.t[0], e.t[1]).translate(-A.cx, -A.bot).scale(A.s0).round(2).toString();
-  characters[c.id] = {
+function entry(c, A, digits = 2){
+  const norm = e => svgpath(e.d).translate(e.t[0], e.t[1]).translate(-A.cx, -A.bot).scale(A.s0).round(digits).toString();
+  return {
     width: r2(A.W), height: r2(A.H),
     skin: c.skin.map(e => ({ d: norm(e), fill: e.fill, ...(e.rule ? { fillRule: e.rule } : {}) })),
     ink: c.ink.map((e, k) => ({
@@ -124,11 +124,21 @@ for (const file of files) {
     attach: attachments(A),   // pre-computed placements of the bundled items: used by the gallery and as a parity oracle for the engine's maths
   };
 }
+for (const file of files) { const c = parse(path.join(SRC, file)); characters[c.id] = entry(c, analyze(c)); }
+// the v6 sets (frens): same flat format as v3, kept at the art's own scale so the stages grow as drawn (scale as in v6/index.html)
+const FREN_KITS = [['unisex', 'v6', 'v6'], ['cute', 'v6_cute', 'v6_cute']];   // [folder, collection, id prefix]
+for (const [kit, , pre] of FREN_KITS) for (const [slugF] of FRENS) FREN_STAGES.forEach((st, n) => {
+  const id = `${pre}_${slugF}_${n}`, c = parse(path.join(HERE, '..', 'frens-svgs', kit, 'flat', slugF, `${slugF}-${n}-${st.toLowerCase()}.svg`), id);
+  characters[id] = entry(c, analyze(c, { s0: 1.15, cx: 0, bot: 0 }), 1);   // 0.1 unit is invisible and keeps the catalog smaller
+});
 // the v4 set: measured the same way the v4 prototype does it, placed with the same attachment maths
 for (const { id, A, character } of buildV4(path.join(HERE, '..', 'shapes_v4'))) characters[`v4_${id}`] = { ...character, attach: attachments(A) };
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '_');
 const species = [...LINES.map(line => ['v3', line]), ...LINES_V4.map(line => ['v4', line])].map(([collection, line]) => ({ id: slug(line[0][1]), collection,
   forms: line.map(([id, name], k) => ({ character: id, name, atLevel: LEVELS[line.length][k], size: [r2(SIZES[line.length][k] * .92), r2(SIZES[line.length][k] * 1.04)] })) }));
+// frens: species v6_<fren> / v6_cute_<fren>, seven stages each; the art already grows, so forms only add a little growth within a stage
+for (const [, collection, pre] of FREN_KITS) for (const [slugF, name] of FRENS)
+  species.push({ id: `${pre}_${slugF}`, collection, forms: FREN_STAGES.map((st, n) => ({ character: `${pre}_${slugF}_${n}`, name: `${name} ${st}`, atLevel: LEVELS[7][n], size: [.94, 1.04] })) });
 const used = new Set(species.flatMap(s => s.forms.map(f => f.character)));
 const missing = Object.keys(characters).filter(id => !used.has(id));
 if (missing.length) console.warn('characters not in any species line:', missing.join(', '));
@@ -136,7 +146,8 @@ if (missing.length) console.warn('characters not in any species line:', missing.
 const catalog = {
   version: VERSION,
   units: 'Character space: origin at the feet (bottom centre), y grows downwards, characters ~100 tall and at most 150 wide. Item transforms are in this space.',
-  collections: { v3: 'The original 46 traced characters (characters/)', v4: 'The 40 textured shapes with eye whites and legs (shapes_v4/)' },
+  collections: { v3: 'The original 46 traced characters (characters/)', v4: 'The 40 textured shapes with eye whites and legs (shapes_v4/)',
+                 v6: 'Frens, unisex set: 8 frens x 7 stages, egg to legend (frens-svgs/unisex)', v6_cute: 'Frens, cute pastel set (frens-svgs/cute)' },
   inkColor: INK,
   characters,
   // same shape the app accepts for items sent at runtime
@@ -172,7 +183,7 @@ const ids = Object.keys(characters).sort(), cells = ids.map((id, n) => `<g trans
 fs.writeFileSync(path.join(OUT, 'gallery.html'), `<!doctype html><meta charset="utf-8"><title>Catalog gallery</title><body style="margin:0;background:#fbf8f2"><svg viewBox="0 0 1600 ${Math.ceil(ids.length / 8) * 225 + 100}" width="1600">${cells}</svg>`);
 
 // ---------- evolution sheets (one per collection): every species line, stage by stage, drawn at its stage size ----------
-for (const [collection, file] of [['v3', 'evolution_sheet.svg'], ['v4', 'evolution_sheet_v4.svg']]) {
+for (const [collection, file] of [['v3', 'evolution_sheet.svg'], ['v4', 'evolution_sheet_v4.svg'], ['v6', 'evolution_sheet_v6.svg'], ['v6_cute', 'evolution_sheet_v6_cute.svg']]) {
   const lines = species.filter(s => s.collection === collection);
   const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const body = id => art(characters[id], id);
@@ -187,7 +198,7 @@ for (const [collection, file] of [['v3', 'evolution_sheet.svg'], ['v4', 'evoluti
       return `${arrow}<g transform="translate(${x} ${base}) scale(${sc})">${body(f.character)}</g>`
         + `<ellipse cx="${x}" cy="${base + 2}" rx="${(characters[f.character].width * sc * .42).toFixed(1)}" ry="4" fill="#000" opacity=".07"/>`
         + `<text x="${x}" y="${base + 24}" text-anchor="middle" font-size="13" font-weight="800" letter-spacing="1.5" fill="#2b2a33" ${font}>${esc(f.name.toUpperCase())}</text>`
-        + `<text x="${x}" y="${base + 40}" text-anchor="middle" font-size="10.5" fill="#9a9184" ${font}>stage ${k + 1} · #${f.character.replace('v4_', '')}</text>`;
+        + `<text x="${x}" y="${base + 40}" text-anchor="middle" font-size="10.5" fill="#9a9184" ${font}>stage ${k + 1} · #${f.character.replace(/^v\d+(_cute)?_/, '')}</text>`;
     }).join('');
     return `<rect x="16" y="${y + 6}" width="${W - 32}" height="${ROW - 12}" rx="18" fill="${r % 2 ? '#f4efe6' : '#f8f4ec'}"/>`
       + `<text x="40" y="${y + ROW / 2 - 4}" font-size="16" font-weight="800" letter-spacing="2" fill="#2b2a33" ${font}>${esc(sp.id.toUpperCase())}</text>`
@@ -195,7 +206,7 @@ for (const [collection, file] of [['v3', 'evolution_sheet.svg'], ['v4', 'evoluti
   }).join('');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`
     + `<rect width="${W}" height="${H}" fill="#fbf8f2"/>`
-    + `<text x="${W / 2}" y="56" text-anchor="middle" font-size="28" font-weight="800" letter-spacing="6" fill="#2b2a33" ${font}>EVOLUTION STAGES${collection === 'v3' ? '' : ' · ' + collection.toUpperCase()}</text>`
+    + `<text x="${W / 2}" y="56" text-anchor="middle" font-size="28" font-weight="800" letter-spacing="6" fill="#2b2a33" ${font}>EVOLUTION STAGES${collection === 'v3' ? '' : ' · ' + collection.replace('_', ' ').toUpperCase()}</text>`
     + `<text x="${W / 2}" y="82" text-anchor="middle" font-size="12" fill="#9a9184" ${font}>${lines.length} species · ${lines.reduce((n, s) => n + s.forms.length, 0)} characters · each stage drawn at its size, arrows show the level it unlocks at</text>`
     + rows + '</svg>';
   fs.writeFileSync(path.join(OUT, file), svg);
@@ -217,7 +228,7 @@ for (const [collection, file] of [['v3', 'evolution_sheet.svg'], ['v4', 'evoluti
     title: 'Critter payloads (generated by compiler/compile.mjs; do not edit by hand)',
     catalogVersion: VERSION,
     $defs: {
-      species: { enum: species.map(s => s.id), description: species.length + ' species. v3 set: ' + species.filter(s => s.collection === 'v3').map(s => s.id).join(', ') + '. v4 set: ' + species.filter(s => s.collection === 'v4').map(s => s.id).join(', ') + '. Both sets can be mixed freely (e.g. a v3 critter sending money to a v4 one).' },
+      species: { enum: species.map(s => s.id), description: species.length + ' species. v3 set: ' + species.filter(s => s.collection === 'v3').map(s => s.id).join(', ') + '. v4 set: ' + species.filter(s => s.collection === 'v4').map(s => s.id).join(', ') + '. v6 frens: ' + species.filter(s => s.collection.startsWith('v6')).map(s => s.id).join(', ') + '. All sets can be mixed freely (e.g. a v3 critter sending money to a v4 one).' },
       critterSpec: {
         type: 'object', required: ['species'],
         properties: {
@@ -272,4 +283,4 @@ for (const [collection, file] of [['v3', 'evolution_sheet.svg'], ['v4', 'evoluti
 }
 
 const kb = (fs.statSync(path.join(OUT, 'critter_catalog.json')).size / 1024).toFixed(0);
-console.log(`${Object.keys(characters).length} characters, ${species.length} species, ${Object.values(K).flat().length} items -> out/critter_catalog.json (${kb} KB), out/gallery.html, docs/evolution_sheet.svg + evolution_sheet_v4.svg, .claude/skills/critter-backend/critter_payload.schema.json`);
+console.log(`${Object.keys(characters).length} characters, ${species.length} species, ${Object.values(K).flat().length} items -> out/critter_catalog.json (${kb} KB), out/gallery.html, docs/evolution_sheet{,_v4,_v6,_v6_cute}.svg, .claude/skills/critter-backend/critter_payload.schema.json`);

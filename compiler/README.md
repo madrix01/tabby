@@ -4,7 +4,7 @@ Measures every character once and writes everything the app needs to compose a c
 
 ```
 npm install
-npm run build      # ../characters/*.svg (v3) + ../shapes_v4/*.svg (v4) + items.mjs -> out/critter_catalog.json, out/gallery.html, ../docs/evolution_sheet*.svg
+npm run build      # ../characters/*.svg (v3) + ../shapes_v4/*.svg (v4) + ../frens-svgs/*/flat (v6) + items.mjs -> out/critter_catalog.json, out/gallery.html, ../docs/evolution_sheet*.svg
 ```
 
 Open `out/gallery.html` after a build. It is drawn from the catalog alone, the same way the app will compose it.
@@ -28,7 +28,7 @@ The app scales this space to the widget size.
 | `characters[id].attach.eyes[item]` | `{ transform, svg }`. Eyewear is generated per character, one lens per eye. |
 | `characters[id].anchors` | The measured points (eye, hat seat, neck, side…). For debugging, or for placing new UI such as speech bubbles. v4 characters add `body: [top, bottom]`, the body without its legs. |
 | `items` | Item SVG snippets: hats, neck items and props. Eyewear is marked `perCharacter`. |
-| `species[]` | Evolution lines. `collection` is `v3` or `v4`. `forms[]` holds `{ character, name, atLevel, size:[min,max] }`; `size` is the scale applied while growing inside that form. v4 character ids are `v4_<shape number>`. |
+| `species[]` | Evolution lines. `collection` is `v3`, `v4`, `v6` or `v6_cute`. `forms[]` holds `{ character, name, atLevel, size:[min,max] }`; `size` is the scale applied while growing inside that form. v4 character ids are `v4_<shape number>`; v6 ones are `v6_<fren>_<stage>` and `v6_cute_<fren>_<stage>`. |
 
 Composition order: skin, then ink (eyes on their own layer), then neck, then eyes, then hat. The prop goes on its own layer and is not tilted with the body.
 
@@ -38,4 +38,5 @@ The catalog uses no `<text>`, no 8-digit hex colours, no `stroke-dasharray` and 
 ## Adding things
 - **v3 character:** drop `character_NN.svg` into `../characters/` and add it to a line in `LINES` (the build warns about any character that isn't in a line), then rebuild.
 - **v4 character:** drop `shape_NN.svg` into `../shapes_v4/` and add it as `v4_NN` to a line in `LINES_V4`, then rebuild. `v4.mjs` parses and measures it the same way `v4/index.html` does.
+- **v6 fren:** add its art under `../frens-svgs/<unisex|cute>/flat/<fren>/` (seven `<fren>-<n>-<stage>.svg` files) and its `[slug, name]` to `FRENS`, then rebuild. Frens keep the art's own scale (×1.15, feet at the origin) instead of being normalised to 100 tall.
 - **Item:** add it to `HATS`, `NECK` or `PROPS` in `items.mjs`. Draw it about 100 wide around its marker `m` and rebuild. Every character gets a placement for it automatically.

@@ -93,5 +93,8 @@ export const LINES_V4 = [
   [['v4_24','Puffin'],  ['v4_37','Boxy'],     ['v4_13','Rowan']],
   [['v4_22','Speckle'], ['v4_27','Dotty'],    ['v4_39','Crag']],
 ];
-export const LEVELS = { 2:[1,6], 3:[1,4,8], 4:[1,3,6,10] };
+// v6 frens: [slug, name] and their seven stages, egg -> legend (character ids v6_<fren>_<n>, v6_cute_<fren>_<n>)
+export const FRENS = [['bloop','Bloop'],['mochi','Mochi'],['puff','Puff'],['pup','Pup'],['berry','Berry'],['pickle','Pickle'],['chiku','Chiku'],['bun','Bun']];
+export const FREN_STAGES = ['Egg','Hatchling','Baby','Kid','Teen','Grown','Legend'];
+export const LEVELS = { 2:[1,6], 3:[1,4,8], 4:[1,3,6,10], 7:[1,2,3,5,7,10,14] };
 export const SIZES  = { 2:[.75,1.15], 3:[.7,1,1.3], 4:[.65,.9,1.15,1.35] };

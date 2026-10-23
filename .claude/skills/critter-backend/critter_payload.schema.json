@@ -34,9 +34,25 @@
         "mound",
         "bean",
         "puffin",
-        "speckle"
+        "speckle",
+        "v6_bloop",
+        "v6_mochi",
+        "v6_puff",
+        "v6_pup",
+        "v6_berry",
+        "v6_pickle",
+        "v6_chiku",
+        "v6_bun",
+        "v6_cute_bloop",
+        "v6_cute_mochi",
+        "v6_cute_puff",
+        "v6_cute_pup",
+        "v6_cute_berry",
+        "v6_cute_pickle",
+        "v6_cute_chiku",
+        "v6_cute_bun"
       ],
-      "description": "29 species. v3 set: blip, totem, sprig, radish, pip, ember, pinky, bunbun, stamp, squidge, snowy, cactoo, drip, lemon, mochi, nimbo. v4 set: dewdrop, pea, sandy, tock, stilts, wiggle, hexo, pebblet, drippy, mound, bean, puffin, speckle. Both sets can be mixed freely (e.g. a v3 critter sending money to a v4 one)."
+      "description": "45 species. v3 set: blip, totem, sprig, radish, pip, ember, pinky, bunbun, stamp, squidge, snowy, cactoo, drip, lemon, mochi, nimbo. v4 set: dewdrop, pea, sandy, tock, stilts, wiggle, hexo, pebblet, drippy, mound, bean, puffin, speckle. v6 frens: v6_bloop, v6_mochi, v6_puff, v6_pup, v6_berry, v6_pickle, v6_chiku, v6_bun, v6_cute_bloop, v6_cute_mochi, v6_cute_puff, v6_cute_pup, v6_cute_berry, v6_cute_pickle, v6_cute_chiku, v6_cute_bun. All sets can be mixed freely (e.g. a v3 critter sending money to a v4 one)."
     },
     "critterSpec": {
       "type": "object",
@@ -757,6 +773,310 @@
             "properties": {
               "form": {
                 "maximum": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "species": {
+                "const": "v6_bloop"
+              }
+            },
+            "required": [
+              "species"
+            ]
+          },
+          "then": {
+            "properties": {
+              "form": {
+                "maximum": 6
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "species": {
+                "const": "v6_mochi"
+              }
+            },
+            "required": [
+              "species"
+            ]
+          },
+          "then": {
+            "properties": {
+              "form": {
+                "maximum": 6
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "species": {
+                "const": "v6_puff"
+              }
+            },
+            "required": [
+              "species"
+            ]
+          },
+          "then": {
+            "properties": {
+              "form": {
+                "maximum": 6
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "species": {
+                "const": "v6_pup"
+              }
+            },
+            "required": [
+              "species"
+            ]
+          },
+          "then": {
+            "properties": {
+              "form": {
+                "maximum": 6
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "species": {
+                "const": "v6_berry"
+              }
+            },
+            "required": [
+              "species"
+            ]
+          },
+          "then": {
+            "properties": {
+              "form": {
+                "maximum": 6
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "species": {
+                "const": "v6_pickle"
+              }
+            },
+            "required": [
+              "species"
+            ]
+          },
+          "then": {
+            "properties": {
+              "form": {
+                "maximum": 6
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "species": {
+                "const": "v6_chiku"
+              }
+            },
+            "required": [
+              "species"
+            ]
+          },
+          "then": {
+            "properties": {
+              "form": {
+                "maximum": 6
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "species": {
+                "const": "v6_bun"
+              }
+            },
+            "required": [
+              "species"
+            ]
+          },
+          "then": {
+            "properties": {
+              "form": {
+                "maximum": 6
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "species": {
+                "const": "v6_cute_bloop"
+              }
+            },
+            "required": [
+              "species"
+            ]
+          },
+          "then": {
+            "properties": {
+              "form": {
+                "maximum": 6
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "species": {
+                "const": "v6_cute_mochi"
+              }
+            },
+            "required": [
+              "species"
+            ]
+          },
+          "then": {
+            "properties": {
+              "form": {
+                "maximum": 6
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "species": {
+                "const": "v6_cute_puff"
+              }
+            },
+            "required": [
+              "species"
+            ]
+          },
+          "then": {
+            "properties": {
+              "form": {
+                "maximum": 6
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "species": {
+                "const": "v6_cute_pup"
+              }
+            },
+            "required": [
+              "species"
+            ]
+          },
+          "then": {
+            "properties": {
+              "form": {
+                "maximum": 6
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "species": {
+                "const": "v6_cute_berry"
+              }
+            },
+            "required": [
+              "species"
+            ]
+          },
+          "then": {
+            "properties": {
+              "form": {
+                "maximum": 6
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "species": {
+                "const": "v6_cute_pickle"
+              }
+            },
+            "required": [
+              "species"
+            ]
+          },
+          "then": {
+            "properties": {
+              "form": {
+                "maximum": 6
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "species": {
+                "const": "v6_cute_chiku"
+              }
+            },
+            "required": [
+              "species"
+            ]
+          },
+          "then": {
+            "properties": {
+              "form": {
+                "maximum": 6
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "species": {
+                "const": "v6_cute_bun"
+              }
+            },
+            "required": [
+              "species"
+            ]
+          },
+          "then": {
+            "properties": {
+              "form": {
+                "maximum": 6
               }
             }
           }

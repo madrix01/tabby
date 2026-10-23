@@ -10,14 +10,40 @@ void main() {
   final catalog = loadCatalog();
 
   test('catalog has every character placed in a species line, in two collections', () {
-    expect(catalog.characters, hasLength(86));
+    expect(catalog.characters, hasLength(198));
     expect(catalog.speciesIn('v3'), hasLength(16));
     expect(catalog.speciesIn('v4'), hasLength(13));
-    expect(catalog.species, hasLength(29));
+    expect(catalog.speciesIn('v6'), hasLength(8));
+    expect(catalog.speciesIn('v6_cute'), hasLength(8));
+    expect(catalog.species, hasLength(45));
     final used = catalog.species.values.expand((s) => s.forms.map((f) => f.character)).toSet();
     expect(used, catalog.characters.keys.toSet());
     expect(catalog.speciesIn('v4').expand((s) => s.forms).every((f) => f.character.startsWith('v4_')), isTrue);
     expect(catalog.speciesIn('v3').expand((s) => s.forms).any((f) => f.character.startsWith('v4_')), isFalse);
+  });
+
+  group('v6 frens', () {
+    test('eight frens per set, seven stages from egg to legend, unlocked at 1, 2, 3, 5, 7, 10, 14', () {
+      for (final set in ['v6', 'v6_cute']) {
+        for (final s in catalog.speciesIn(set)) {
+          expect(s.id, startsWith('${set}_'));
+          expect(s.forms.map((f) => f.atLevel), [1, 2, 3, 5, 7, 10, 14]);
+          expect(s.forms.first.name, endsWith(' Egg'));
+          expect(s.forms.last.name, endsWith(' Legend'));
+        }
+      }
+      expect(catalog.species['v6_mochi']!.forms[3].name, 'Mochi Kid', reason: 'no clash with the v3 mochi line');
+      expect(catalog.species['mochi']!.collection, 'v3');
+    });
+
+    test('a fren keeps its stage item and its face: eyes blink, a mood replaces the mouth', () {
+      final kid = compose(catalog, const CritterSpec(species: 'v6_bloop', form: 3))!;
+      expect(kid.character.ink.where((p) => p.eye), isNotEmpty);
+      final mouth = kid.character.ink.firstWhere((p) => p.mouth);
+      final happy = compose(catalog, const CritterSpec(species: 'v6_bloop', form: 3, mood: CritterMood.happy))!;
+      expect(happy.base, isNot(contains(mouth.d!)));
+      expect(kid.character.height, closeTo(115, 1), reason: 'drawn at the art\'s own scale, like v6/index.html');
+    });
   });
 
   group('v4 set', () {

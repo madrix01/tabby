@@ -1,16 +1,16 @@
 ---
 name: critter-engine
-description: Add and use the critter_engine Flutter package (github.com/madrix01/tabby) to render evolving pet critters (two art sets, v3 and v4, usable side by side) with hats, eyewear, neck items and props from a JSON spec. Use when installing critter_engine, rendering a CritterView, building or validating critter JSON payloads (species, form, attachments, inline items), defining custom items as JSON, using the glow look (glow, halo, shadow, shading), setting a mood (happy, sad, food, entertainment, travel, shopping, empty_wallet), playing the send-money animation between two critters (MoneyTransferView), or adding new characters or items to the catalog.
+description: Add and use the critter_engine Flutter package (github.com/madrix01/tabby) to render evolving pet critters (art sets v3, v4 and the v6 frens, usable side by side) with hats, eyewear, neck items and props from a JSON spec. Use when installing critter_engine, rendering a CritterView, building or validating critter JSON payloads (species, form, attachments, inline items), defining custom items as JSON, using the glow look (glow, halo, shadow, shading), setting a mood (happy, sad, food, entertainment, travel, shopping, empty_wallet), playing the send-money animation between two critters (MoneyTransferView), or adding new characters or items to the catalog.
 ---
 
 # critter_engine
 
-A Flutter package that draws a "critter" from a JSON spec. A critter is one of 86 characters in two art sets (46 flat-colour **v3** characters and 40 textured **v4** shapes with eye whites and legs), at some stage of its evolution line, optionally wearing a hat, eyewear and a neck item, and holding a prop. All character geometry is precomputed in a bundled catalog, so the app only composes SVG and never measures anything.
+A Flutter package that draws a "critter" from a JSON spec. A critter is one of 198 characters in four art sets (46 flat-colour **v3** characters, 40 textured **v4** shapes with eye whites and legs, and the **v6** frens: 8 frens × 7 stages in a unisex and a cute set), at some stage of its evolution line, optionally wearing a hat, eyewear and a neck item, and holding a prop. All character geometry is precomputed in a bundled catalog, so the app only composes SVG and never measures anything.
 
 Repo layout (github.com/madrix01/tabby):
 - `critter_engine/`: the Flutter package. This is what apps depend on.
-- `compiler/`: Node tool that builds `critter_engine/assets/critter_catalog.json` from `characters/*.svg` (v3 set) and `shapes_v4/*.svg` (v4 set). Only needed when adding characters or bundled items.
-- `v3/index.html`, `v4/index.html`: browser prototypes; open them to see the same critters animated.
+- `compiler/`: Node tool that builds `critter_engine/assets/critter_catalog.json` from `characters/*.svg` (v3), `shapes_v4/*.svg` (v4) and `frens-svgs/*/flat` (v6). Only needed when adding characters or bundled items.
+- `v3/index.html`, `v4/index.html`, `v6/index.html`: browser prototypes; open them to see the same critters animated.
 
 ## 1. Install
 
@@ -40,7 +40,7 @@ import 'package:flutter/material.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final catalog = await CritterCatalog.load();   // ~1.4 MB JSON (both sets) from the package's assets; load once at startup
+  final catalog = await CritterCatalog.load();   // ~2.3 MB JSON (all sets) from the package's assets; load once at startup
   runApp(MyApp(catalog: catalog));
 }
 ```
@@ -130,10 +130,16 @@ Missing fields get defaults, and unknown ids are ignored. Values of the wrong ty
 | puffin | Puffin → Boxy → Rowan | 1, 4, 8 |
 | speckle | Speckle → Dotty → Crag | 1, 4, 8 |
 
-### Using both sets
-- **No switch needed:** both sets live in the one catalog and a spec only names a `species`, so a v3 and a v4 critter can sit side by side or send money to each other (`MoneyTransferView(from: blip…, to: dewdrop…)`).
-- **Same frame:** both sets share the frame and character space (~100 units tall, feet at the origin), so sizes stay comparable.
-- **Listing one set:** `catalog.speciesIn('v4')` (or `'v3'`) lists one set's lines, e.g. for a picker; `species.collection` tells you which set a line is from.
+### v6 frens (8 frens × 7 stages, two art sets)
+- **Species ids:** unisex set `v6_<fren>`, cute pastel set `v6_cute_<fren>`, where `<fren>` is one of bloop, mochi, puff, pup, berry, pickle, chiku, bun. The prefix keeps `v6_mochi` apart from the v3 `mochi` line.
+- **Stages and unlock levels:** form 0 Egg (Lv 1), 1 Hatchling (2), 2 Baby (3), 3 Kid (5), 4 Teen (7), 5 Grown (10), 6 Legend (14). Each stage comes with its own item drawn into the art (shell cap, juice box or rattle, skateboard or balloon, headphones, sneakers or rosette, gold chain and sparkles).
+- **Size:** every stage is drawn about the same height, a bit taller than v3, as in `v6/index.html`; forms only grow slightly within a stage.
+- **Glow:** the frens were designed for the dark glow look (`"look": "glow"`).
+
+### Using the sets together
+- **No switch needed:** every set lives in the one catalog and a spec only names a `species`, so a v3 and a v4 critter can sit side by side or send money to each other (`MoneyTransferView(from: blip…, to: dewdrop…)`).
+- **Same frame:** all sets share the frame and character space (feet at the origin), so sizes stay comparable.
+- **Listing one set:** `catalog.speciesIn('v4')` (or `'v3'`, `'v6'`, `'v6_cute'`) lists one set's lines, e.g. for a picker; `species.collection` tells you which set a line is from.
 - **What's different about v4:** v4 characters have a texture clipped to the body, white eyes with pupils (they blink together), body-coloured legs, and no drawn mouth; moods add one under the eyes. Some v4 shapes (Blocky, Hexo, Domer…) have closed eyes in the texture: they don't blink, but eyewear and moods still sit on them.
 
 To derive `form` from xp on the client instead, use the exported curve. A form is unlocked once `levelOf(xp) >= form.atLevel`:
@@ -312,9 +318,10 @@ cd ../critter_engine && flutter test           # parity, svg validity, goldens
 
 - **New v3 character:** drop `character_NN.svg` (flat paths/circles, eyes and mouth in `#2b2a33`) into `characters/`, then add it to an evolution line in `compiler/items.mjs` under `LINES`. The build warns about any character that isn't in a line.
 - **New v4 character:** drop `shape_NN.svg` (same structure as the others: body path, clipped texture group, `#ffffff` eye whites, `#1c1a1f` pupils and legs) into `shapes_v4/` and add it as `v4_NN` to a line under `LINES_V4`. `compiler/v4.mjs` parses and measures it the way `v4/index.html` does.
-- **Evolution sheets:** the build also writes `docs/evolution_sheet.svg` (v3) and `docs/evolution_sheet_v4.svg`.
+- **New fren or stage art:** replace the files in `frens-svgs/<set>/flat/<fren>/` (same `<fren>-<n>-<stage>.svg` names; coloured parts plus `#2b2a33` eyes and mouth) and rebuild. A new fren goes into `FRENS` in `compiler/items.mjs`.
+- **Evolution sheets:** the build also writes `docs/evolution_sheet.svg` (v3), `docs/evolution_sheet_v4.svg`, `docs/evolution_sheet_v6.svg` and `docs/evolution_sheet_v6_cute.svg`.
 - **New bundled item:** add it to `HATS`, `NECK`, `PROPS` or `EYEWEAR` in `compiler/items.mjs`, using the same shapes as the JSON items above.
-- **Checking the result:** open `compiler/out/gallery.html` to see every character (both sets) wearing items.
+- **Checking the result:** open `compiler/out/gallery.html` to see every character (all sets) wearing items.
 - **Golden images:** if a change is intentional, refresh them with `flutter test --update-goldens test/golden_test.dart`. Goldens are rendered on macOS; on Linux CI either regenerate them there or skip that test.
 
 ## Troubleshooting
