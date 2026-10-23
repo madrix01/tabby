@@ -1,22 +1,22 @@
 import 'package:flutter/foundation.dart';
 
-/// Tuning for [CritterLook.glow]. Every knob is a multiplier where 1 = the default look and 0 = off,
+/// Tuning for [CritterLook.glow]. Knobs are multipliers on the base effect (0 = off); the defaults are the house look,
 /// so `{"halo": 0}` keeps the shading but drops the halo, `{"shading": 0}` gives flat colour with a halo, etc.
 ///
 /// ```json
 /// "look": "glow",
-/// "glow": { "halo": 0.85, "blur": 1, "brightness": 1.35, "shading": 1, "gloss": 1, "shadow": 1, "color": "#ff8a3d" }
+/// "glow": { "halo": 0.35, "blur": 0.8, "brightness": 1, "shading": 1.5, "gloss": 0.45, "shadow": 1.5, "color": "#ff8a3d" }
 /// ```
 /// Values are clamped to sane ranges; anything missing keeps its default.
 @immutable
 class CritterGlow {
   const CritterGlow({
-    this.halo = .85,
-    this.blur = 1,
-    this.brightness = 1.35,
-    this.shading = 1,
-    this.gloss = 1,
-    this.shadow = 1,
+    this.halo = .35,
+    this.blur = .8,
+    this.brightness = 1,
+    this.shading = 1.5,
+    this.gloss = .45,
+    this.shadow = 1.5,
     this.color,
   });
 
@@ -47,12 +47,12 @@ class CritterGlow {
     double v(String k, double def, double lo, double hi) => ((j[k] as num?)?.toDouble() ?? def).clamp(lo, hi);
     final c = j['color'];
     return CritterGlow(
-      halo: v('halo', .85, 0, 1),
-      blur: v('blur', 1, 0, 3),
-      brightness: v('brightness', 1.35, 1, 2),
-      shading: v('shading', 1, 0, 1.5),
-      gloss: v('gloss', 1, 0, 1.5),
-      shadow: v('shadow', 1, 0, 1.5),
+      halo: v('halo', .35, 0, 1),
+      blur: v('blur', .8, 0, 3),
+      brightness: v('brightness', 1, 1, 2),
+      shading: v('shading', 1.5, 0, 1.5),
+      gloss: v('gloss', .45, 0, 1.5),
+      shadow: v('shadow', 1.5, 0, 1.5),
       color: c is String && RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(c) ? c : null,
     );
   }

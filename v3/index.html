@@ -228,8 +228,8 @@ const save = () => { try { localStorage.critters1 = JSON.stringify(pets); } catc
 const svg = document.getElementById('svg'), hearts = {}, hover = new Set(), evo = {}, refs = [];
 // ---------- glow look: shaded bodies, gloss, eye glints, contact shadow, colour halo ----------
 let glow = false; try { glow = localStorage.critterLook === 'glow'; } catch {}
-// same knobs as the Flutter engine's CritterGlow: multipliers where 1 = default and 0 = off
-const GLOW_KNOBS = { halo:[.85,0,1], blur:[1,0,3], brightness:[1.35,1,2], shading:[1,0,1.5], gloss:[1,0,1.5], shadow:[1,0,1.5] };
+// same knobs and defaults as the Flutter engine's CritterGlow (0 = off)
+const GLOW_KNOBS = { halo:[.35,0,1], blur:[.8,0,3], brightness:[1,1,2], shading:[1.5,0,1.5], gloss:[.45,0,1.5], shadow:[1.5,0,1.5] };   // [default, min, max]
 let glowCfg = Object.fromEntries(Object.entries(GLOW_KNOBS).map(([k,[d]]) => [k, d])); glowCfg.color = '';
 try { Object.assign(glowCfg, JSON.parse(localStorage.critterGlow || '{}')); } catch {}
 function shade(hex, t){                  // mix #rrggbb towards white (t > 0) or black (t < 0)
