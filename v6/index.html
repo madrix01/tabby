@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frens v6</title>
+<style>
+  :root { --ink:#2b2a33; --red:#e8494b; --gold:#f6c945; --paper:#fbf8f2; --sans:"Avenir Next","Futura","Trebuchet MS",system-ui,sans-serif; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+         color:var(--ink); font:16px/1.4 var(--sans); background:var(--paper); }
+  h1 { margin:0; font:800 1.3rem var(--sans); letter-spacing:.28em; text-transform:uppercase; }
+  #stage { width:min(98vw,1400px); }
+  svg { width:100%; height:auto; overflow:visible; display:block; }
+  .pet { cursor:pointer; transition:opacity .4s; }
+  .pet.dim { opacity:.15; }
+  .pet.dim .label, .pet.dim .sel-mark { display:none; }
+  #sendrow { display:flex; gap:8px; align-items:center; min-width:100%; justify-content:center; }
+  #amount { font:600 14px var(--sans); width:110px; padding:6px 12px; border-radius:99px; border:2px solid var(--ink); background:transparent; color:var(--ink); }
+  .label { font:700 10px var(--sans); letter-spacing:.22em; text-anchor:middle; fill:var(--ink); text-transform:uppercase; }
+
+  .eye { transform-box:fill-box; transform-origin:50% 50%; transition:transform .08s; }
+  .blink .eye { transform:scaleY(.1); }
+
+  /* evolution: flash a dark silhouette, then pop into the new form */
+  .pet.evolving .grow { animation:evoFlash .32s steps(1) infinite; }
+  .pw { transform-box:fill-box; transform-origin:50% 100%; }
+  .pet.pop .pw { animation:pop .9s cubic-bezier(.3,1.7,.5,1) 1; }
+  .spark { font-size:18px; fill:var(--gold); pointer-events:none; animation:spark 1.2s ease-out forwards; }
+  .burst { fill:var(--gold); pointer-events:none; transform-box:fill-box; transform-origin:50% 50%; animation:burst 1s ease-out forwards; }
+  .sel-mark { fill:var(--red); }
+  .heart { font-size:20px; fill:var(--red); pointer-events:none; animation:up 1s ease-out forwards; }
+  .lvl { font:800 13px var(--sans); letter-spacing:.1em; fill:var(--red); pointer-events:none; text-anchor:middle; animation:up 1.4s ease-out forwards; }
+  @keyframes evoFlash { 0% { filter:none; } 50% { filter:brightness(0) drop-shadow(0 0 8px var(--gold)); } }
+  @keyframes pop   { 0% { transform:scale(.2,.2); } 60% { transform:scale(1.15,1.15); } 100% { transform:scale(1,1); } }
+  @keyframes spark { from { transform:translate(0,0) scale(.3); opacity:1; } to { transform:translate(var(--dx),var(--dy)) scale(1.2); opacity:0; } }
+  @keyframes burst { from { transform:scale(.2); opacity:.95; } to { transform:scale(9); opacity:0; } }
+  @keyframes up { to { transform:translateY(-60px); opacity:0; } }
+
+  /* emotions */
+  .emo  { font:800 15px var(--sans); text-anchor:middle; pointer-events:none; transform-box:fill-box; transform-origin:50% 50%; animation:emoUp 1.6s ease-out forwards; }   /* scale around itself, not the svg origin */
+  .rain { stroke:#7fb6e8; stroke-width:2; stroke-linecap:round; pointer-events:none; animation:rain .7s linear forwards; }
+  .tear { transform-box:fill-box; animation:tear 1.6s ease-in infinite; }
+  /* empty wallet: the wallet shakes every beat, moths flutter out, a little dust falls */
+  .shake { animation:shake 1.4s ease-in-out infinite; }
+  .moth  { pointer-events:none; animation:mothFly 2.4s ease-out forwards; }
+  .flap  { transform-box:fill-box; transform-origin:50% 50%; animation:flap .12s linear infinite alternate; }
+  .dust  { fill:#b9b2a6; pointer-events:none; animation:dust .9s ease-in forwards; }
+  @keyframes shake   { 0%, 58%, 100% { transform:rotate(0); } 64% { transform:rotate(-14deg); } 71% { transform:rotate(11deg); } 78% { transform:rotate(-8deg); } 85% { transform:rotate(5deg); } }
+  @keyframes mothFly { 0% { transform:translate(0,0) scale(.6); opacity:0; } 10% { opacity:1; } 40% { transform:translate(var(--dx),-28px) scale(1); }
+                       70% { transform:translate(calc(var(--dx) * -.5),-54px) scale(1); opacity:1; } 100% { transform:translate(var(--dx),-84px) scale(.9); opacity:0; } }
+  @keyframes flap    { to { transform:scaleY(.25); } }
+  @keyframes dust    { to { transform:translateY(26px); opacity:0; } }
+  .chew { transform-box:fill-box; transform-origin:50% 50%; animation:chew .3s ease-in-out infinite alternate; }
+  @keyframes emoUp { 0% { transform:translate(0,0) scale(.6); opacity:0; } 15% { opacity:1; } 100% { transform:translate(var(--dx),-55px) scale(1.1); opacity:0; } }
+  @keyframes rain  { to { transform:translateY(34px); opacity:0; } }
+  @keyframes tear  { 0% { transform:translateY(0); opacity:0; } 20% { opacity:1; } 100% { transform:translateY(14px); opacity:0; } }
+  @keyframes chew  { to { transform:scaleY(.35); } }
+
+
+  progress { width:200px; height:8px; accent-color:var(--red); }
+  #xpinfo { min-width:100%; text-align:center; font-size:13px; letter-spacing:.04em; }
+  #ui { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:760px; padding:0 12px; align-items:center; }
+  select, button { font:600 14px var(--sans); padding:6px 12px; border-radius:99px; border:2px solid var(--ink); background:transparent; color:var(--ink); cursor:pointer; }
+  button:hover { background:var(--ink); color:#fff; }
+  /* glow look: dark stage with a spotlight from above (same lighting as the Flutter engine's CritterLook.glow) */
+  body.glow { --ink:#f3ece4; background:radial-gradient(ellipse 70% 90% at 50% -12%, #6b5a48 0%, #221c18 55%, #0e0c0b 100%); }
+  body.glow select { background:#1c1714; }
+  #glowcfg { display:none; min-width:100%; justify-content:center; flex-wrap:wrap; gap:6px 16px; font:600 13px var(--sans); }
+  body.glow #glowcfg { display:flex; }
+  #glowcfg label { display:flex; align-items:center; gap:6px; }
+  #glowcfg input[type=range] { width:90px; accent-color:#f6c945; }
+  #look { display:flex; gap:6px; align-items:center; font:600 14px var(--sans); cursor:pointer; }
+  #name { font-weight:800; min-width:100%; text-align:center; letter-spacing:.2em; text-transform:uppercase; }
+</style>
+</head>
+<body>
+  <h1>Frens</h1>
+  <div id="stage"><svg id="svg" viewBox="0 -20 1300 330"></svg></div>
+  <div id="ui">
+    <div id="name"></div>
+    <div id="xpinfo"></div><div style="min-width:100%;text-align:center"><progress id="xp" max="1" value="0"></progress></div>
+    <select id="kit"></select>
+    <select id="species"></select>
+    <select id="evostage"></select>
+    <select id="hat"></select>
+    <select id="eyes"></select>
+    <select id="neck"></select>
+    <select id="prop"></select>
+    <select id="gait"></select>
+    <select id="emotion"></select>
+    <button id="moods">Random moods</button>
+    <label id="look"><input type="checkbox" id="glow"> Glow</label>
+    <div id="glowcfg"></div>
+    <button id="roll">Reroll this one</button>
+    <button id="rollAll">Reroll all</button>
+    <span style="min-width:100%"></span>
+    <button id="dance">Dance</button>
+    <button id="run">Walk</button>
+    <button id="danceAll">Dance party</button>
+    <button id="runAll">Parade</button>
+    <button id="stop">Stop all</button>
+    <button id="feed">Feed 🍎</button>
+    <button id="evolve">Evolve ⚡</button>
+    <div id="sendrow">
+      <select id="from"></select> <span>→</span> <select id="to"></select>
+      <input id="amount" type="number" min="1" value="500" aria-label="amount in rupees">
+      <button id="send">Send ₹</button>
+    </div>
+  </div>
+<script src="characters.js"></script>
+<script src="growth.js"></script>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const CHARS = Object.fromEntries(window.CHAR_SVGS.map(c => [c.id, c]));
+
+// ---------- species: the eight frens, each growing through seven stages (egg -> legend); two art sets ----------
+const FRENS = [['bloop','Bloop'],['mochi','Mochi'],['puff','Puff'],['pup','Pup'],['berry','Berry'],['pickle','Pickle'],['chiku','Chiku'],['bun','Bun']];
+const STAGES = ['Egg','Hatchling','Baby','Kid','Teen','Grown','Legend'], AT = [1,2,3,5,7,10,14];   // unlock levels (Lv 14 = 1406 xp)
+const KITS = { unisex:'Unisex: classy, goofy', cute:'Cute: pastel, kawaii' };
+let kit = 'unisex'; try { if (KITS[localStorage.frensKit6]) kit = localStorage.frensKit6; } catch {}
+// the art already grows from stage to stage (shared viewBox, feet at the origin), so forms only add a little growth within a stage
+const speciesFor = k => FRENS.map(([slug, name]) => ({ name, forms: STAGES.map((st, n) => ({ id:`${k}-${slug}-${n}`, name:`${name} ${st}`, at:AT[n], size:[.94, 1.04] })) }));
+let SPECIES = speciesFor(kit);
+const FREN_SCALE = 1.15;   // art units -> stage units, the same for every fren so their relative sizes stay true
+
+// ---------- measure each character once: normalise to feet-at-origin, then find eyes, head top, neck, side ----------
+const probe = document.createElementNS(NS,'svg'); probe.setAttribute('style','position:absolute;width:0;height:0;visibility:hidden'); document.body.append(probe);
+const translateOf = el => { const m = /translate\(([-\d.]+)[ ,]+([-\d.]+)\)/.exec(el.getAttribute('transform') || ''); return m ? [+m[1], +m[2]] : [0,0]; };
+const ANCH = {};
+function analyze(id){
+  if (ANCH[id]) return ANCH[id];
+  const c = CHARS[id], g = document.createElementNS(NS,'g');
+  g.innerHTML = `<g class="s">${c.skin.join('')}</g><g class="k">${c.ink.join('')}</g>`; probe.append(g);
+  const bb = g.querySelector('.s').getBBox(), s0 = FREN_SCALE, cx = 0, bot = 0;   // drawn feet-at-origin already: keep the art's own scale and ground line
+  const N = (x, y) => [(x-cx)*s0, (y-bot)*s0];
+  // outline points of every coloured part (normalised)
+  const pts = []; for (const p of g.querySelectorAll('.s path')) { const [tx,ty] = translateOf(p), L = p.getTotalLength(), n = 300;
+    const ring = []; for (let k=0;k<n;k++){ const q = p.getPointAtLength(L*k/n); ring.push(N(q.x+tx, q.y+ty)); } pts.push(ring); }
+  // ink parts: eyes are the upper ones, mouth the lower ones
+  const ink = [...g.querySelectorAll('.k > *')].map((el, idx) => { const b = el.getBBox(), [tx,ty] = translateOf(el), [x0,y0] = N(b.x+tx, b.y+ty), [x1,y1] = N(b.x+b.width+tx, b.y+b.height+ty);
+    return { idx, cx:(x0+x1)/2, cy:(y0+y1)/2, r:Math.max(x1-x0, y1-y0)/2, bottom:y1, w:x1-x0 }; });
+  let eyes = ink, mouth = [];
+  if (ink.length === 2 && Math.abs(ink[0].cy-ink[1].cy) > Math.abs(ink[0].cx-ink[1].cx)*.8) { const [a,b] = [...ink].sort((p,q)=>p.cy-q.cy); eyes = [a]; mouth = [b]; }
+  else if (ink.length >= 3) { const ys = ink.map(e=>e.cy), mid = (Math.min(...ys)+Math.max(...ys))/2; eyes = ink.filter(e=>e.cy < mid); mouth = ink.filter(e=>e.cy >= mid); }
+  probe.removeChild(g);
+  const W = bb.width*s0, H = bb.height*s0, all = pts.flat();
+  const ec = eyes.length ? [eyes.reduce((a,e)=>a+e.cx,0)/eyes.length, eyes.reduce((a,e)=>a+e.cy,0)/eyes.length] : [0, -H*.7];
+  const xs = eyes.map(e=>e.cx), span = eyes.length > 1 ? Math.max(...xs) - Math.min(...xs) : 0;
+  const lr = [...eyes].sort((a,b)=>a.cx-b.cx), angle = eyes.length === 2 ? Math.max(-20, Math.min(20, Math.atan2(lr[1].cy-lr[0].cy, lr[1].cx-lr[0].cx)*180/Math.PI)) : 0;
+  const eyeR = eyes.length ? eyes.reduce((a,e)=>a+e.r,0)/eyes.length : 4;
+  // width of the body around x at height y (nearest outline crossings either side)
+  // the stretch of body crossed by a horizontal line at y: the interval containing x, else the nearest one
+  // per part, then merged: overlapping parts (top-knots, wings, two-tone bodies) widen the body instead of splitting it
+  const spanAt = (y, x) => { const iv = [];
+    for (const ring of pts) { const X = [];
+      for (let k=0;k<ring.length;k++){ const a = ring[k], b = ring[(k+1)%ring.length];
+        if ((a[1]-y)*(b[1]-y) <= 0 && a[1] !== b[1]) X.push(a[0] + (b[0]-a[0])*(y-a[1])/(b[1]-a[1])); }
+      X.sort((p,q)=>p-q); for (let k=0;k+1<X.length;k+=2) iv.push([X[k], X[k+1]]); }
+    iv.sort((p,q)=>p[0]-q[0]); const merged = [];
+    for (const v of iv) { const m = merged[merged.length-1]; if (m && v[0] <= m[1]) m[1] = Math.max(m[1], v[1]); else merged.push([...v]); }
+    let best = null, bd = Infinity;
+    for (const [l, r] of merged) { const d = x < l ? l-x : x > r ? x-r : 0; if (d < bd) { bd = d; best = [l, r]; } }
+    return best || [x - W*.3, x + W*.3]; };
+  const len = s => s[1] - s[0], mid = s => (s[0] + s[1]) / 2;
+  const headS = spanAt(ec[1], ec[0]), headW = len(headS);
+  // hat: wanted width from the head, then walk down from the top until the body is wide enough to sit it on (skips antennae, tips, ears)
+  const hatW = Math.min(W*.6, clamp(headW*.72, Math.max(18, span*1.6), Math.max(30, span*3.2)));
+  const win = Math.max(span*.8, 8), head = all.filter(p => Math.abs(p[0]-ec[0]) < win), topY = Math.min(...(head.length ? head : all).map(p=>p[1]));
+  let seatY = topY, seat = spanAt(topY + 1, ec[0]);
+  for (let y = topY + 1; y < ec[1] - eyeR*1.6; y += 1) {
+    const sp = spanAt(y, ec[0]); if (sp[0] > ec[0] + 2 || sp[1] < ec[0] - 2) continue;   // only real body under the eyes (not gaps under a floating halo)
+    seat = sp; seatY = y; if (len(seat) >= hatW*.82) break; }
+  // centre: averaged over the rows the brim covers, so one row of outline change can't flip it between bumps
+  let hx = 0, hn = 0; for (let y = seatY; y <= seatY + hatW*.15; y += 1) { const sp = spanAt(y, ec[0]); if (sp[0] <= ec[0] + 2 && sp[1] >= ec[0] - 2) { hx += mid(sp); hn++; } }
+  const hat = { at:[clamp(hn ? hx/hn : mid(seat), ec[0] - hatW*.3, ec[0] + hatW*.3), seatY + 2], w:Math.min(hatW, len(seat)*1.25) };   // stays over the eyes on long bodies
+  // neck: under the mouth (or well under a lone eye), centred on the body there
+  const mouthBottom = mouth.length ? Math.max(...mouth.map(m=>m.bottom)) : ec[1] + Math.max(eyeR*4, H*.12);
+  const neckY = Math.min(mouthBottom + Math.max(4, eyeR*1.3), -H*.15), neckS = spanAt(neckY, ec[0]);
+  const mouthC = mouth.length ? [mouth.reduce((a,m)=>a+m.cx,0)/mouth.length, mouth.reduce((a,m)=>a+m.cy,0)/mouth.length] : [ec[0], ec[1] + Math.max(eyeR*3.2, 9)];
+  const mouthW = mouth.length ? Math.max(...mouth.map(m=>m.w)) : Math.max(span*.5, 10);
+  return ANCH[id] = { s0, cx, bot, W, H, eye:ec, eyes:eyes.map(e=>[e.cx, e.cy]), span, angle, eyeR, eyeIdx:eyes.map(e=>e.idx), mouthIdx:mouth.map(m=>m.idx), mouthC, mouthW, topY, hat, headS, headW, neck:[clamp(mid(neckS), ec[0] - headW*.2, ec[0] + headW*.2), neckY], neckW:len(neckS), side:[W/2 - 4, 0] };
+}
+
+// ---------- attachments: each slot has one anchor + one size rule; every item is drawn 100 wide around its marker m ----------
+// transform = translate(anchor) rotate(eye-line angle) scale(k) translate(-marker)
+const place = (anchor, m, k, ang=0) => `translate(${anchor[0].toFixed(1)} ${anchor[1].toFixed(1)}) rotate(${ang.toFixed(1)}) scale(${k.toFixed(3)}) translate(${-m[0]} ${-m[1]})`;
+const SLOTS = {
+  hat:  { anchor: A => A.hat.at,                           width: A => A.hat.w, tilt:true },
+  eyes: { anchor: A => A.eye, tilt:true },                 // eyewear is drawn per character: one lens per eye, lens size from the eye, not the spacing
+  neck: { anchor: (A, it, k) => [A.neck[0], Math.min(A.neck[1], -2 - it.h*k)], width: (A, it) => clamp(A.neckW*it.fit, 18, 70) },   // lifted if it would hang below the feet
+  prop: { anchor: A => A.side,                              width: () => 80 },
+};
+const ITEMS = {
+  hat: {
+    TopHat: { m:[50,72], svg:`<rect x="24" y="8" width="52" height="58" rx="4" fill="#2b2a33"/><rect x="6" y="62" width="88" height="10" rx="5" fill="#2b2a33"/><rect x="24" y="48" width="52" height="9" fill="#e8494b"/>` },
+    Party:  { m:[50,72], svg:`<path d="M50 4 L84 72 H16 Z" fill="#f78fb3"/><path d="M33 52 H67 M40 32 H60" stroke="#f6c945" stroke-width="6"/><circle cx="50" cy="5" r="8" fill="#f6c945"/>` },
+    Crown:  { m:[50,62], svg:`<path d="M12 62 L6 14 L30 36 L50 6 L70 36 L94 14 L88 62 Z" fill="#f6c945" stroke="#e0a800" stroke-width="3" stroke-linejoin="round"/><circle cx="50" cy="46" r="6" fill="#e8494b"/><circle cx="26" cy="50" r="4" fill="#3a85f2"/><circle cx="74" cy="50" r="4" fill="#3a85f2"/>` },
+    Cap:    { m:[40,62], svg:`<path d="M6 62 Q6 12 40 12 Q74 12 74 62Z" fill="#e8494b"/><path d="M66 56 Q110 52 106 66 H64Z" fill="#c23638"/><circle cx="40" cy="12" r="5" fill="#c23638"/>` },
+    Beanie: { m:[50,64], svg:`<path d="M12 62 Q12 10 50 10 Q88 10 88 62Z" fill="#3a85f2"/><rect x="8" y="52" width="84" height="16" rx="8" fill="#fff"/><circle cx="50" cy="8" r="9" fill="#fff"/>` },
+    Chef:   { m:[50,66], svg:`<path d="M26 66 V42 Q6 42 8 24 Q10 6 30 14 Q40 -2 58 12 Q82 6 90 24 Q94 42 74 42 V66Z" fill="#fff" stroke="#d7d3cc" stroke-width="3" stroke-linejoin="round"/><path d="M26 56 H74" stroke="#d7d3cc" stroke-width="3"/>` },
+  },
+  eyes: {   // draw(A) -> markup around the eye midpoint; lenses sit exactly on the eyes
+    Goggles: { draw: A => lenses(A, 1.25, (x,r) => `<circle cx="${x}" cy="0" r="${r}" fill="#8fd3ff" stroke="#e8494b" stroke-width="${r*.32}"/><path d="M${x-r*.45} ${-r*.35} q${r*.3} ${-r*.3} ${r*.65} ${-r*.2}" stroke="#fff" stroke-width="${r*.18}" stroke-linecap="round" fill="none"/>`, '#e8494b', true) },
+    Shades:  { draw: A => lenses(A, 1.15, (x,r) => `<rect x="${x-r*1.1}" y="${-r*.75}" width="${r*2.2}" height="${r*1.5}" rx="${r*.45}" fill="#2b2a33"/><path d="M${x-r*.6} ${-r*.3} h${r*.5}" stroke="#fff" stroke-width="${r*.15}" stroke-linecap="round" opacity=".6"/>`, '#2b2a33') },
+    Round:   { draw: A => lenses(A, 1.05, (x,r) => `<circle cx="${x}" cy="0" r="${r}" fill="#ffffff55" stroke="#2b2a33" stroke-width="${r*.26}"/>`, '#2b2a33') },
+    ThreeD:  { draw: A => lenses(A, 1.15, (x,r) => `<rect x="${x-r*1.1}" y="${-r*.75}" width="${r*2.2}" height="${r*1.5}" rx="${r*.3}" fill="${x > 0 ? '#3a85f2' : '#e8494b'}" fill-opacity=".85" stroke="#f4f1ea" stroke-width="${r*.3}"/>`, '#f4f1ea') },   // red left, blue right
+    Hearts:  { draw: A => lenses(A, 1.2,  (x,r) => `<path transform="translate(${x} ${-r*.15}) scale(${r/18})" d="M0 18 C-30 -2 -16 -22 0 -8 C16 -22 30 -2 0 18Z" fill="#f2679b"/>`, '#f2679b') },
+  },
+  neck: {
+    BowTie:    { fit:.42, h:28, m:[50,14], svg:`<path d="M50 14 L6 0 Q0 14 6 28 Z M50 14 L94 0 Q100 14 94 28 Z" fill="#e8494b"/><circle cx="50" cy="14" r="9" fill="#c23638"/>` },
+    GoldChain: { fit:.72, h:48, m:[50,0],  svg:`<path d="M2 0 Q50 46 98 0" stroke="#f6c945" stroke-width="6" stroke-dasharray="1 8" stroke-linecap="round" fill="none"/><circle cx="50" cy="34" r="13" fill="#f6c945" stroke="#e0a800" stroke-width="3"/><text x="50" y="40" font-size="16" font-weight="800" text-anchor="middle" fill="#b88600">$</text>` },
+    Medal:     { fit:.5,  h:80, m:[50,0],  svg:`<path d="M30 0 L46 46 M70 0 L54 46" stroke="#3a85f2" stroke-width="12" stroke-linecap="round"/><circle cx="50" cy="58" r="20" fill="#f6c945" stroke="#e0a800" stroke-width="4"/><path d="M50 46 l4 8 9 1 -7 6 2 9 -8 -5 -8 5 2 -9 -7 -6 9 -1Z" fill="#e0a800"/>` },
+  },
+  prop: {
+    GoldBar:   { m:[0,0], svg:`<path d="M0 0 H46 L38 -17 H8Z" fill="#f6c945"/><path d="M8 -17 H38 L34 -22 H12Z" fill="#ffe27a"/><path d="M12 -8 H34" stroke="#e0a800" stroke-width="2.5" stroke-linecap="round"/><path d="M44 -30 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2Z" fill="#f6c945"/>` },
+    GoldStack: { m:[0,0], svg:`<g id="gb"><path d="M0 0 H40 L33 -14 H7Z" fill="#f6c945"/><path d="M7 -14 H33 L30 -18 H10Z" fill="#ffe27a"/></g><path d="M44 0 H84 L77 -14 H51Z" fill="#f2bd2c"/><path d="M51 -14 H77 L74 -18 H54Z" fill="#ffe27a"/><path d="M22 -18 H62 L55 -32 H29Z" fill="#f6c945"/><path d="M29 -32 H55 L52 -36 H32Z" fill="#ffe27a"/>` },
+    MoneyBag:  { m:[0,0], svg:`<path d="M6 0 Q-4 -30 18 -40 L14 -48 H38 L34 -40 Q56 -30 46 0Z" fill="#c9a36b"/><path d="M14 -42 H38" stroke="#8a6a3b" stroke-width="3"/><text x="26" y="-11" font-size="20" font-weight="800" text-anchor="middle" fill="#6b8f2e">$</text>` },
+    Coffee:    { m:[0,0], svg:`<path d="M4 -30 H34 L30 0 H8Z" fill="#fff" stroke="#d7d3cc" stroke-width="2"/><path d="M5 -22 H33 L32 -12 H6Z" fill="#c9714e"/><path d="M34 -24 q10 2 0 12" stroke="#d7d3cc" stroke-width="3" fill="none"/><path d="M14 -36 q-3 -5 0 -9 M22 -36 q-3 -5 0 -9" stroke="#c8c4bc" stroke-width="2" fill="none" stroke-linecap="round"/>` },
+  },
+};
+// lens radius follows the eye size (and never lets the two lenses overlap); a bridge joins them, goggles add a strap across the head
+function lenses(A, grow, lens, bridge, strap=false){
+  const half = A.span/2, r = clamp(A.eyeR*2.3*grow, 5, half ? half*.9 : 99), xs = half ? [-half, half] : [0], hw = Math.min(A.headW/2 + 2, half + r*2.4);   // strap wraps the head, not a long body
+  return (strap ? `<path d="M${-hw} 0 H${hw}" stroke="#2b2a33" stroke-width="${r*.4}" stroke-linecap="round"/>` : '')
+       + (half ? `<path d="M${-half+r*.9} 0 H${half-r*.9}" stroke="${bridge}" stroke-width="${r*.26}" stroke-linecap="round"/>` : '')
+       + xs.map(x => lens(x, r)).join('');
+}
+function attachment(slot, name, A){
+  const it = ITEMS[slot][name]; if (!it) return '';
+  const S = SLOTS[slot], ang = S.tilt ? A.angle : 0;
+  if (it.draw) { const at = S.anchor(A); return `<g transform="translate(${at[0].toFixed(1)} ${at[1].toFixed(1)}) rotate(${ang.toFixed(1)})">${it.draw(A)}</g>`; }
+  const k = S.width(A, it)/100;
+  return `<g transform="${place(S.anchor(A, it, k), it.m, k, ang)}">${it.svg}</g>`;
+}
+
+// ---------- gaits: whole-body motion (the legs are part of the drawing) ----------
+// freq cycles/s, speed units/s, jump = hop height, sway = side tilt (deg), lean = forward tilt, squash = landing squash
+const GAITS = {
+  waddle: { freq:1.6, speed:42, jump:3,  sway:9, lean:0, squash:.03 },
+  hop:    { freq:1.4, speed:62, jump:18, sway:0, lean:4, squash:.12 },
+  scoot:  { freq:3.2, speed:58, jump:1.5,sway:2, lean:8, squash:.02 },
+  bounce: { freq:1.1, speed:46, jump:32, sway:0, lean:0, squash:.16 },
+  strut:  { freq:1.2, speed:40, jump:5,  sway:5, lean:-5, squash:.04 },
+  dance:  { freq:1.2, speed:0,  jump:10, sway:13, lean:0, squash:.08 },
+};
+const GAIT_NAMES = Object.keys(GAITS).filter(k => k !== 'dance');
+
+// ---------- state ----------
+const rnd  = n => Math.floor(Math.random() * n), pick = a => a[rnd(a.length)];
+const pickOrNone = o => { const k = Object.keys(o); return k.concat(k.map(()=>''))[rnd(k.length*2)]; };   // like Tabby: ~half the time nothing
+const roll = () => ({ likesPets: Math.random()>.45, hat:pickOrNone(ITEMS.hat), eyes:pickOrNone(ITEMS.eyes), neck:pickOrNone(ITEMS.neck), prop:pickOrNone(ITEMS.prop), gait:pick(GAIT_NAMES) });
+const START = [[0,40],[1,160],[2,700],[5,300],[3,1500]];       // [species, xp]
+// slots: GAP apart, centred in a STAGE_W-wide stage (raise GAP for more room between critters; keep the svg viewBox in step)
+const GAP = 260, STAGE_W = 1300, XS = [0,1,2,3,4].map(k => STAGE_W/2 + (k - 2)*GAP), GROUND = 250;
+const pos = [...XS], dir = [1,1,1,1,1], mode = ['idle','idle','idle','idle','idle'];   // idle | dance | walk | home
+let pets, sel = 0;
+try { pets = JSON.parse(localStorage.critters6); } catch {}
+if (!Array.isArray(pets) || pets.length !== 5) pets = START.map(([species, xp]) => ({ ...roll(), species, xp, form: Growth.traits(xp, SPECIES[species].forms).earned }));
+const save = () => { try { localStorage.critters6 = JSON.stringify(pets); } catch {} };
+
+// ---------- render ----------
+const svg = document.getElementById('svg'), hearts = {}, hover = new Set(), evo = {}, refs = [];
+// ---------- glow look: shaded bodies, gloss, eye glints, contact shadow, colour halo ----------
+let glow = false; try { glow = (localStorage.critterLook6 ?? 'glow') === 'glow'; } catch {}
+// same knobs and defaults as the Flutter engine's CritterGlow (0 = off)
+const GLOW_KNOBS = { halo:[.35,0,1], blur:[.8,0,3], brightness:[1,1,2], shading:[1.5,0,1.5], gloss:[.45,0,1.5], shadow:[1.5,0,1.5] };   // [default, min, max]
+let glowCfg = Object.fromEntries(Object.entries(GLOW_KNOBS).map(([k,[d]]) => [k, d])); glowCfg.color = '';
+try { Object.assign(glowCfg, JSON.parse(localStorage.critterGlow6 || '{}')); } catch {}
+function shade(hex, t){                  // mix #rrggbb towards white (t > 0) or black (t < 0)
+  const m = /^#([0-9a-f]{6})$/i.exec(hex); if (!m) return hex;
+  const v = parseInt(m[1], 16), to = t > 0 ? 255 : 0, f = Math.abs(t);
+  return '#' + [16, 8, 0].map(sh => { const x = (v >> sh) & 255; return Math.round(x + (to - x)*f).toString(16).padStart(2, '0'); }).join('');
+}
+function glowParts(i, c, A){
+  const g = glowCfg, fillOf = e => (/fill="([^"]+)"/.exec(e) || [])[1], into = `scale(${A.s0}) translate(${-A.cx} ${-A.bot})`;
+  const lift = (g.brightness - 1)*.2;   // 1.35 -> +.07, as in the engine
+  const halo = g.color
+    ? (([r,gr,b]) => `0 0 0 0 ${r}  0 0 0 0 ${gr}  0 0 0 0 ${b}  0 0 0 ${g.halo} 0`)([1,3,5].map(k => parseInt(g.color.slice(k,k+2),16)/255))
+    : `${g.brightness} 0 0 0 ${lift}  0 ${g.brightness} 0 0 ${lift}  0 0 ${g.brightness} 0 ${lift}  0 0 0 ${g.halo} 0`;
+  const defs = c.skin.map((e, k) => `<radialGradient id="g${i}_${k}" cx=".36" cy=".28" r=".95"><stop offset="0" stop-color="${shade(fillOf(e), .38*g.shading)}"/><stop offset=".5" stop-color="${fillOf(e)}"/><stop offset="1" stop-color="${shade(fillOf(e), -.35*g.shading)}"/></radialGradient>`).join('')
+    + `<radialGradient id="sh${i}"><stop offset="0" stop-color="#000" stop-opacity="${Math.min(1, .6*g.shadow)}"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>`
+    + `<radialGradient id="hl${i}"><stop offset="0" stop-color="#fff" stop-opacity="${Math.min(1, .6*g.gloss)}"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>`
+    + `<clipPath id="cp${i}" transform="${into}">${c.skin.join('')}</clipPath>`
+    + `<filter id="halo${i}" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="${((A.W*.06 + 3)*g.blur).toFixed(1)}"/><feColorMatrix type="matrix" values="${halo}"/></filter>`;
+  const skin = c.skin.map((e, k) => e.replace(/fill="[^"]+"/, `fill="url(#g${i}_${k})"`)).join('');
+  const hx = -A.W*.2, hy = -A.H*.72;
+  const gloss = g.gloss > 0 ? `<g clip-path="url(#cp${i})"><ellipse cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" rx="${(A.W*.15).toFixed(1)}" ry="${(A.H*.12).toFixed(1)}" transform="rotate(-25 ${hx.toFixed(1)} ${hy.toFixed(1)})" fill="url(#hl${i})"/></g>` : '';
+  const glint = e => { const m = g.gloss > 0 && /<circle[^>]*cx="([-\d.]+)"[^>]*cy="([-\d.]+)"[^>]*r="([-\d.]+)"/.exec(e); if (!m) return '';
+    const [x, y, r] = m.slice(1).map(Number); return `<circle cx="${x + r*.32}" cy="${y - r*.32}" r="${r*.32}" fill="#fff"/>`; };
+  const shadow = g.shadow > 0 ? `<ellipse class="shadow" cx="0" cy="1" rx="${(A.W*.55).toFixed(1)}" ry="${(5 + A.W*.03).toFixed(1)}" fill="url(#sh${i})"/>` : '<ellipse class="shadow" rx="0" ry="0"/>';
+  return { defs, skin, gloss, glint, shadow, into, halo: g.halo > 0 && g.blur > 0 };
+}
+
+// ---------- emotions: a face (mouth, brows, cheeks, tear), idle body motion, floating particles,
+// and a thought bubble / cloud / ground item that says what the critter is up to ----------
+const EMOTIONS = ['happy','sad','food','entertainment','travel','shopping','empty_wallet'];
+const EMO = {
+  happy:         { mouth:'grin',  cheeks:true, motion:{ jump:7, freq:1.8, sway:3, squash:.08 }, fx:{ every:500, glyphs:['✦','♥','✦'], colors:['#f6c945','#f2679b','#ffb800'] } },
+  sad:           { mouth:'frown', brows:true, tear:true, cloud:true, motion:{ slump:.07, lean:-3, freq:.5, sway:1.5 }, fx:{ every:160, rain:true } },
+  food:          { mouth:'chew',  bubble:'burger', motion:{ jump:1.5, freq:1.4, sway:2, squash:.03 }, fx:{ every:900, glyphs:['nom','yum'], colors:['#c9714e','#e8494b'] } },
+  entertainment: { mouth:'grin',  bubble:'popcorn', eyes:'ThreeD', motion:{ jump:6, freq:1.1, sway:11, squash:.06 }, fx:{ every:420, glyphs:['♪','♫'], colors:['#3a85f2','#e8494b','#16b79d','#8c6fd6'] } },
+  travel:        { mouth:'smile', bubble:'plane', ground:'suitcase', motion:{ jump:3, freq:1.3, sway:4, lean:3, squash:.03 }, fx:{ every:1400, glyphs:['✈'], colors:['#3a85f2'] } },
+  shopping:      { mouth:'open',  bubble:'bag', ground:'bags', motion:{ jump:5, freq:2.2, sway:2, squash:.06 }, fx:{ every:520, glyphs:['$','%','$'], colors:['#2f9e44','#e8494b','#e0a800'] } },
+  // sad face + slumped and sighing, holding an empty wallet upside down that it keeps shaking: moths and dust come out, "₹0" floats up
+  empty_wallet:  { mouth:'frown', brows:true, tear:true, wallet:true, bubble:'zero', motion:{ slump:.09, lean:-2, freq:.45, sway:1.2, squash:.05 }, fx:{ every:1400, wallet:true, glyphs:['₹0'], colors:['#9a9184'] } },
+};
+const INK = '#2b2a33';
+const ICONS = {   // ~24 units, centred on 0,0
+  zero:    `<text y="6" font-size="16" font-weight="800" text-anchor="middle" fill="#e8494b">₹0</text>`,
+  burger:  `<path d="M-11 -1 Q-11 -11 0 -11 Q11 -11 11 -1Z" fill="#f0a64a"/><circle cx="-4" cy="-7" r=".9" fill="#fff4d6"/><circle cx="3" cy="-8" r=".9" fill="#fff4d6"/><rect x="-12" y="-1" width="24" height="3" rx="1.5" fill="#7cc23c"/><rect x="-11" y="2" width="22" height="4" rx="2" fill="#8a4b2f"/><path d="M-11 6 H11 Q11 10 0 10 Q-11 10 -11 6Z" fill="#f0a64a"/>`,
+  popcorn: `<circle cx="-5" cy="-5" r="4" fill="#fff1b8"/><circle cx="1" cy="-7" r="4.4" fill="#fffbe6"/><circle cx="6" cy="-4" r="3.8" fill="#fff1b8"/><path d="M-9 -2 L9 -2 L6 12 L-6 12Z" fill="#fff"/><path d="M-5 -2 L-4 12 M0 -2 V12 M5 -2 L4 12" stroke="#e8494b" stroke-width="2.4"/>`,
+  plane:   `<path d="M-12 3 L11 -3 Q15 -4 14 -1 L-9 6Z" fill="#3a85f2"/><path d="M-1 1 L-7 -9 L-3 -9 L5 -1Z" fill="#2f6fd0"/><path d="M-9 4 L-13 -2 L-11 -2 L-6 3Z" fill="#2f6fd0"/>`,
+  bag:     `<path d="M-9 -4 H9 L10 11 H-10Z" fill="#f2679b"/><path d="M-5 -4 Q-5 -11 0 -11 Q5 -11 5 -4" stroke="#c94d7f" stroke-width="2" fill="none"/>`,
+};
+const GROUND_ITEMS = {   // stand on the ground, drawn leftwards from (0,0)
+  suitcase: `<rect x="-32" y="-24" width="32" height="22" rx="4" fill="#c9714e"/><path d="M-21 -24 V-29 H-11 V-24" stroke="#8a4b2f" stroke-width="2.5" fill="none"/><path d="M-32 -14 H0" stroke="#8a4b2f" stroke-width="2"/><rect x="-14" y="-21" width="8" height="5" rx="1" fill="#f6c945"/><circle cx="-27" cy="-1" r="2.5" fill="#555"/><circle cx="-5" cy="-1" r="2.5" fill="#555"/>`,
+  bags:     `<path d="M-38 -24 H-20 L-18 0 H-40Z" fill="#3a85f2"/><path d="M-34 -24 Q-34 -32 -29 -32 Q-24 -32 -24 -24" stroke="#2f6fd0" stroke-width="2" fill="none"/><path d="M-22 -18 H-2 L0 0 H-24Z" fill="#f2679b"/><path d="M-17 -18 Q-17 -26 -12 -26 Q-7 -26 -7 -18" stroke="#c94d7f" stroke-width="2" fill="none"/><text x="-12" y="-6" font-size="9" font-weight="800" text-anchor="middle" fill="#fff">%</text>`,
+};
+function emoMouth(kind, A){
+  // headW can under-measure on multi-part bodies, hence the 14 floor
+  const w = clamp(A.mouthW*1.1, 9, Math.max(14, A.headW*.42)), [x, y] = A.mouthC, sw = Math.max(2, w*.13).toFixed(1), h = w/2;
+  const at = inner => `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})">${inner}</g>`;
+  return at({
+    grin:  `<path d="M${-h} ${-w*.1} Q0 ${w*.75} ${h} ${-w*.1}Z" fill="${INK}"/><path d="M${-h*.6} ${-w*.02} H${h*.6}" stroke="#fff" stroke-width="${(w*.1).toFixed(1)}" stroke-linecap="round"/><ellipse cx="0" cy="${w*.3}" rx="${w*.2}" ry="${w*.1}" fill="#f0788e"/>`,
+    smile: `<path d="M${-h*.8} 0 Q0 ${w*.5} ${h*.8} 0" stroke="${INK}" stroke-width="${sw}" stroke-linecap="round" fill="none"/>`,
+    frown: `<path d="M${-h*.75} ${w*.22} Q0 ${-w*.2} ${h*.75} ${w*.22}" stroke="${INK}" stroke-width="${sw}" stroke-linecap="round" fill="none"/>`,
+    open:  `<ellipse cx="0" cy="${w*.08}" rx="${w*.3}" ry="${w*.36}" fill="${INK}"/><ellipse cx="0" cy="${w*.28}" rx="${w*.18}" ry="${w*.1}" fill="#f0788e"/>`,
+    chew:  `<ellipse class="chew" cx="0" cy="0" rx="${w*.34}" ry="${w*.24}" fill="${INK}"/>`,
+  }[kind]);
+}
+function emoFace(e, A){
+  const r = A.eyeR, out = [emoMouth(e.mouth, A)];
+  if (e.brows) for (const [x, y] of A.eyes) { const s = x >= A.eye[0] ? 1 : -1;     // worried brows: inner ends raised
+    out.push(`<path d="M${(x + s*r*1.6).toFixed(1)} ${(y - r*2).toFixed(1)} L${(x - s*r*1.2).toFixed(1)} ${(y - r*3.2).toFixed(1)}" stroke="${INK}" stroke-width="${Math.max(1.8, r*.7).toFixed(1)}" stroke-linecap="round"/>`); }
+  if (e.tear && A.eyes.length) { const [x, y] = A.eyes[A.eyes.length - 1];
+    out.push(`<path class="tear" d="M${x} ${y + r*1.4} q${-r*.9} ${r*1.6} 0 ${r*2.2} q${r*.9} ${-r*.6} 0 ${-r*2.2}Z" fill="#6cc4ff"/>`); }
+  if (e.cheeks) for (const [x, y] of A.eyes) out.push(`<ellipse cx="${(x + (x - A.eye[0])*.25).toFixed(1)}" cy="${(y + r*2.3).toFixed(1)}" rx="${(r*1.5).toFixed(1)}" ry="${(r*.85).toFixed(1)}" fill="#ff7fa5" opacity=".45"/>`);
+  return out.join('');
+}
+// where the bubble / cloud sit in character space (also used to spawn particles)
+// open wallet held upside down (opening towards the ground), ~36 wide, centred on 0,0
+const WALLET = `<g transform="rotate(168)"><path d="M-18 0 L-16 -15 Q0 -20 16 -15 L18 0Z" fill="#8a5a3a"/><path d="M-18 0 H18 L16 15 Q0 19 -16 15Z" fill="#a8703f"/>
+  <path d="M-13 0 H13" stroke="#5e3a22" stroke-width="1.6" stroke-linecap="round"/><path d="M-12 -10 H12 L11 -4 H-11Z" fill="#c99a6b"/><rect x="9" y="4" width="8" height="6" rx="2" fill="#f6c945"/></g>`;
+const emoSpots = (A, hat) => { const lift = hat ? A.hat.w*.7 : 0;   // clear the hat if one is worn
+  const head = Math.min(A.hat.at[1], A.topY + 6);   // above top-knots and antennae too, not just the hat seat
+  return { bubble:[A.W*.42 + 12, A.hat.at[1] - 12], cloud:[A.eye[0], head - 34 - lift], top:[A.eye[0], head - 8 - lift], wallet:[A.W/2 + 2, -A.H*.36] }; };
+function emoExtras(e, A, hat){
+  const sp = emoSpots(A, hat), out = [];
+  if (e.bubble) { const [x, y] = sp.bubble;
+    out.push(`<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><circle cx="-14" cy="20" r="2.5" fill="#fff" stroke="#d7d3cc" stroke-width="1.5"/><circle cx="-8" cy="13" r="3.5" fill="#fff" stroke="#d7d3cc" stroke-width="1.5"/><circle r="17" fill="#fff" stroke="#d7d3cc" stroke-width="2"/>${ICONS[e.bubble]}</g>`); }
+  if (e.cloud) { const [x, y] = sp.cloud;
+    out.push(`<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><circle cx="-10" cy="2" r="8" fill="#9aa3ad"/><circle cx="0" cy="-3" r="10" fill="#9aa3ad"/><circle cx="11" cy="2" r="8" fill="#9aa3ad"/><rect x="-18" y="2" width="37" height="8" rx="4" fill="#9aa3ad"/></g>`); }
+  if (e.ground) out.push(`<g transform="translate(${(-A.W/2 + 2).toFixed(1)} 0)">${GROUND_ITEMS[e.ground]}</g>`);
+  if (e.wallet) { const [x, y] = sp.wallet; out.push(`<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><g class="shake">${WALLET}</g></g>`); }
+  return out.join('');
+}
+
+function petSVG(p, i){
+  const sp = SPECIES[p.species], t = Growth.traits(p.xp, sp.forms, p.form), f = t.form, c = CHARS[f.id], A = analyze(f.id);
+  const G = glow ? glowParts(i, c, A) : null, E = EMO[p.emotion];
+  const ink = c.ink.map((e, k) => A.eyeIdx.includes(k) ? `<g class="eye">${e}${G ? G.glint(e) : ''}</g>` : E && A.mouthIdx.includes(k) ? '' : e).join('');   // an emotion draws its own mouth     // eyes wrapped so blinking doesn't fight their translate
+  const items = `${attachment('neck', p.neck, A)}${attachment('eyes', E?.eyes || p.eyes, A)}${attachment('hat', p.hat, A)}`;   // a mood can put on its own eyewear
+  const skin = G ? G.skin : c.skin.join('');
+  return `<g class="pet ${p.likesPets?'likes':'hates'} ${evo[i]?'evolving':''} ${xfer && !xfer.who.includes(i) ? 'dim' : ''}" data-i="${i}" transform="translate(${pos[i]} ${GROUND})">
+    ${G ? `<defs>${G.defs}</defs>` : ''}
+    <g class="grow" transform="scale(${t.scale.toFixed(3)})"><g class="pw">
+      ${G ? G.shadow : `<ellipse class="shadow" cx="0" cy="1" rx="${(A.W*.42).toFixed(1)}" ry="4" fill="#000" opacity=".08"/>`}
+      <g class="body">
+        ${G?.halo ? `<g filter="url(#halo${i})"><g transform="${G.into}">${skin}</g>${items}</g>` : ''}
+        <g transform="scale(${A.s0}) translate(${-A.cx} ${-A.bot})">${skin}${ink}</g>
+        ${G ? G.gloss : ''}
+        ${E ? emoFace(E, A) : ''}
+        ${items}
+      </g>
+      ${E ? emoExtras(E, A, p.hat) : ''}
+      ${p.prop ? `<g class="prop">${attachment('prop', p.prop, A)}</g>` : ''}
+    </g></g>
+    <text class="label" y="26">${f.name}</text>
+    ${i===sel ? `<path class="sel-mark" d="M-6 40 L6 40 L0 33Z"/>` : ''}
+  </g>`;
+}
+function bindRefs(){ svg.querySelectorAll('.pet').forEach(el => { const i = +el.dataset.i; refs[i] = { el, body:el.querySelector('.body'), shadow:el.querySelector('.shadow'), prop:el.querySelector('.prop') }; }); }
+function xpUI(){
+  const p = pets[sel], t = Growth.traits(p.xp, SPECIES[p.species].forms, p.form);
+  const nx = t.nextForm ? ` · evolves into ${t.nextForm.name} at Lv ${t.nextForm.at} (${t.nextForm.xp} xp)` : ' · final form';
+  document.getElementById('xpinfo').textContent = `Lv ${t.level} · ${Math.floor(t.xp)}/${t.nextLevelXp} xp${nx}`;
+  document.getElementById('xp').value = t.levelFrac;
+}
+function render(){
+  Object.values(hearts).forEach(clearInterval);
+  const order = pets.map((_, i) => i).sort((a, b) => (xfer?.who.includes(a) ? 1 : 0) - (xfer?.who.includes(b) ? 1 : 0));   // send-money pair drawn on top
+  svg.innerHTML = order.map(i => petSVG(pets[i], i)).join('');
+  bindRefs(); hover.forEach(startHearts);
+  pets.forEach((_,i) => LAST[i] && applyPose(i, LAST[i]));
+  xpUI();
+  const p = pets[sel], opts = (id, vals, cur, none, label = v => v) => document.getElementById(id).innerHTML =
+    (none ? `<option value="">${none}</option>` : '') + vals.map(([v, txt]) => `<option value="${v}" ${String(v)===String(cur)?'selected':''}>${label(txt)}</option>`).join('');
+  document.getElementById('name').textContent = SPECIES[p.species].forms[p.form].name + (p.likesPets ? ' · loves pets' : ' · hates pets');
+  opts('species', SPECIES.map((s,k) => [k, s.name]), p.species);
+  opts('kit', Object.entries(KITS), kit, '', v => 'art: ' + v);
+  { const who = pets.map((q,k) => [k, `${k + 1}. ${SPECIES[q.species].forms[q.form].name}`]), f = document.getElementById('from'), t = document.getElementById('to');
+    const fv = f.value || '0', tv = t.value || '1';
+    opts('from', who, fv, '', v => 'from ' + v); opts('to', who, tv, '', v => 'to ' + v); }
+  opts('evostage', SPECIES[p.species].forms.map((f,k) => [k, `${k + 1}. ${f.name} (Lv ${f.at})`]), p.form, '', v => 'stage ' + v);
+  for (const slot of ['hat','eyes','neck','prop']) opts(slot, Object.keys(ITEMS[slot]).map(v => [v, v.replace(/([a-z])([A-Z])/g,'$1 $2')]), p[slot], `no ${slot}`);
+  opts('gait', GAIT_NAMES.map(v => [v, v]), p.gait, '', v => 'walk: ' + v);
+  opts('emotion', EMOTIONS.map(v => [v, v]), p.emotion || '', 'mood: none', v => 'mood: ' + v);
+  save();
+}
+
+// ---------- motion: one pose per frame, applied to the whole body (origin = feet, so tilt/squash pivot on the ground) ----------
+const TAU = Math.PI*2, S = Math.sin, C = Math.cos, LAST = [], A_ = pets.map(() => ({ ph:Math.random(), k:0, hop:0 }));
+const hop = i => { A_[i].hop = .6; };
+function pose(i, dt, t){
+  const a = A_[i], p = pets[i], m = mode[i], busy = !!evo[i], dr = dir[i];
+  const moving = !busy && m !== 'idle', g = m === 'dance' ? GAITS.dance : (GAITS[p.gait] || GAITS.waddle);
+  a.k += ((moving?1:0) - a.k) * Math.min(1, dt*8); const k = a.k;
+  if (moving) a.ph += dt*g.freq;
+  const ph = a.ph, hov = hover.has(i) && !busy, step = Math.abs(S(TAU*ph));   // two steps per cycle
+  let by = 0, lean = 0, sx = 1, sy = 1;
+  if (!busy) { const br = S(TAU*t/3 + i); sy += .025*br; sx -= .012*br; }    // breathing
+  by -= g.jump*k*step;
+  const land = Math.pow(1 - step, 6)*k;                                      // squash right at touch-down
+  sy *= 1 - g.squash*land + g.squash*.5*k*step; sx *= 1 + g.squash*land*.8;
+  lean = g.sway*k*S(TAU*ph) + dr*g.lean*k;
+  if (hov && p.likesPets) { const b = S(TAU*2.8*t); sy *= 1 + .07*b; sx *= 1 - .04*b; }
+  if (hov && !p.likesPets) lean += 3*S(t*55);
+  const em = !busy && EMO[p.emotion]?.motion;
+  if (em) {                                   // emotion body language while standing (fades out when walking/dancing)
+    const q = 1 - k; a.eph = (a.eph || 0) + dt*(em.freq || 1); const st = Math.abs(S(TAU*a.eph)), l2 = Math.pow(1 - st, 6)*q*(em.squash || 0);
+    by -= (em.jump || 0)*q*st; lean += (em.sway || 0)*q*S(TAU*a.eph) + (em.lean || 0)*q;
+    sy *= 1 - l2 + (em.squash || 0)*.5*q*st; sx *= 1 + l2*.8;
+    if (em.slump) { sy *= 1 - em.slump*q; sx *= 1 + em.slump*.6*q; }
+  }
+  if (a.hop > 0) { const pp = 1 - a.hop/.6, air = S(Math.PI*pp); by -= 26*air; sy *= 1 + .08*air; sx *= 1 - .05*air; a.hop -= dt; }
+  if (a.catch > 0) { const c = a.catch/.22; sy *= 1 - .12*c; sx *= 1 + .09*c; a.catch -= dt; }      // squash as money lands
+  lean += TX[i] || 0;                                                                                 // wind-up lean towards the receiver
+  return { by, lean, sx, sy, flip: m === 'walk' || m === 'home' ? dr : 1 };
+}
+function applyPose(i, P){
+  const r = refs[i]; if (!r) return; LAST[i] = P;
+  r.body.setAttribute('transform', `translate(0 ${P.by.toFixed(2)}) rotate(${P.lean.toFixed(2)}) scale(${(P.sx*P.flip).toFixed(3)} ${P.sy.toFixed(3)})`);
+  r.shadow.setAttribute('transform', `scale(${(1 + P.by/90).toFixed(3)} 1)`);   // shadow shrinks while airborne
+  r.prop?.setAttribute('transform', P.flip < 0 ? 'scale(-1 1)' : '');
+}
+
+// ---------- idle + pet actions ----------
+const g = i => svg.querySelector(`.pet[data-i="${i}"]`);
+function blink(i){ const el = g(i); if (el) { el.classList.add('blink'); setTimeout(() => el.classList.remove('blink'), 150); } setTimeout(() => blink(i), 600 + Math.random()*3500); }
+pets.forEach((_,i) => setTimeout(() => blink(i), Math.random()*2000));
+setInterval(() => { const i = rnd(5); if (!hover.has(i) && mode[i]==='idle' && !evo[i] && !['sad','empty_wallet'].includes(pets[i].emotion)) hop(i); }, 2500);
+// emotion particles: sparkles, notes, $ tags, rain from the cloud...
+const emoClock = [];
+setInterval(() => {
+  pets.forEach((p, i) => { const e = EMO[p.emotion]; if (!e || evo[i] || !refs[i]) return;
+    emoClock[i] = (emoClock[i] || 0) + 100; if (emoClock[i] < e.fx.every) return; emoClock[i] = 0;
+    const A = analyze(SPECIES[p.species].forms[p.form].id), sc = Growth.traits(p.xp, SPECIES[p.species].forms, p.form).scale, sp = emoSpots(A, p.hat);
+    const X = v => pos[i] + v*sc, Y = v => GROUND + v*sc;
+    if (e.fx.rain) { const l = document.createElementNS(NS,'line'), x = X(sp.cloud[0] + (Math.random()*28 - 14)), y = Y(sp.cloud[1] + 10);
+      l.setAttribute('class','rain'); l.setAttribute('x1',x); l.setAttribute('x2',x); l.setAttribute('y1',y); l.setAttribute('y2',y + 6); svg.append(l); setTimeout(() => l.remove(), 700); return; }
+    if (e.fx.wallet) {
+      const wx = X(sp.wallet[0]), wy = Y(sp.wallet[1] + 10);
+      for (let d = 0; d < 3; d++) { const c = document.createElementNS(NS,'circle'); c.setAttribute('class','dust');
+        c.setAttribute('cx', wx + Math.random()*16 - 8); c.setAttribute('cy', wy); c.setAttribute('r', 1.2 + Math.random()*1.6);
+        c.style.animationDelay = (.9 + d*.08) + 's'; c.style.opacity = 0; svg.append(c); setTimeout(() => c.remove(), 2000); }
+      if (Math.random() < .65) {                          // a moth flutters out of the empty wallet
+        const m = document.createElementNS(NS,'g'); m.setAttribute('transform', `translate(${wx.toFixed(1)} ${(wy - 4).toFixed(1)})`);
+        m.innerHTML = `<g class="moth" style="--dx:${(Math.random()*36 - 18).toFixed(0)}px; animation-delay:.9s; opacity:0"><g class="flap"><ellipse cx="-4.5" cy="0" rx="5" ry="3.6" fill="#cfc8bc"/><ellipse cx="4.5" cy="0" rx="5" ry="3.6" fill="#cfc8bc"/></g><ellipse rx="1.6" ry="3.4" fill="#8d877d"/></g>`;
+        svg.append(m); setTimeout(() => m.remove(), 3400); return; }
+    }
+    const t = document.createElementNS(NS,'text'), k = rnd(e.fx.glyphs.length);
+    t.textContent = e.fx.glyphs[k]; t.setAttribute('class','emo'); t.setAttribute('fill', e.fx.colors[k % e.fx.colors.length]);
+    t.setAttribute('x', X(sp.top[0] + (Math.random()*.6 - .3)*A.W)); t.setAttribute('y', Y(sp.top[1])); t.style.setProperty('--dx', (Math.random()*30 - 15) + 'px');
+    svg.append(t); setTimeout(() => t.remove(), 1600);
+  });
+}, 100);
+function startHearts(i){
+  clearInterval(hearts[i]);
+  if (!pets[i].likesPets) return;
+  hearts[i] = setInterval(() => {
+    addXp(i,'pet');
+    const t = document.createElementNS(NS,'text'); t.textContent = '❤'; t.setAttribute('class','heart');
+    t.setAttribute('x', pos[i]-20+Math.random()*40); t.setAttribute('y', 110+Math.random()*30); svg.append(t); setTimeout(() => t.remove(), 1000);
+  }, 250);
+}
+svg.addEventListener('mouseover', e => { const el = e.target.closest('.pet'); if (!el) return; const i = +el.dataset.i; if (!hover.has(i)) { hover.add(i); startHearts(i); } });
+svg.addEventListener('mouseout',  e => { const el = e.target.closest('.pet'); if (!el || el.contains(e.relatedTarget)) return; const i = +el.dataset.i; hover.delete(i); clearInterval(hearts[i]); });
+svg.addEventListener('click', e => { const el = e.target.closest('.pet'); if (el) { sel = +el.dataset.i; render(); } });
+
+// ---------- growth + evolution ----------
+function float(i, text, cls, y=60, ms=1500){ const t = document.createElementNS(NS,'text'); t.textContent = text; t.setAttribute('class',cls); t.setAttribute('x', pos[i]); t.setAttribute('y', y); svg.append(t); setTimeout(() => t.remove(), ms); }
+function addXp(i, event, amount=1){
+  const forms = SPECIES[pets[i].species].forms, before = Growth.traits(pets[i].xp, forms, pets[i].form), r = Growth.gain(pets[i].xp, event, amount);
+  pets[i].xp = r.xp; const after = Growth.traits(r.xp, forms, pets[i].form);
+  if (r.leveledUp) { float(i,'LEVEL UP!','lvl'); render(); }
+  else g(i)?.querySelector('.grow')?.setAttribute('transform', `scale(${after.scale.toFixed(3)})`);
+  if (i===sel) xpUI();
+  checkEvolution(i);
+}
+function checkEvolution(i){ const to = Growth.evolutionDue(pets[i].xp, SPECIES[pets[i].species].forms, pets[i].form); if (to >= 0 && !evo[i]) evolve(i, to); }
+// flash the old silhouette ~2s, then swap to the next character in the line with a burst + sparkles (attachments re-fit by themselves)
+function evolve(i, to){
+  const forms = SPECIES[pets[i].species].forms, from = forms[pets[i].form].name;
+  evo[i] = true; mode[i] = 'idle'; render();
+  setTimeout(() => {
+    pets[i].form = to; delete evo[i]; render();
+    g(i)?.classList.add('pop'); setTimeout(() => g(i)?.classList.remove('pop'), 1000);
+    const b = document.createElementNS(NS,'circle'); b.setAttribute('class','burst'); b.setAttribute('cx',pos[i]); b.setAttribute('cy',180); b.setAttribute('r',14); svg.append(b); setTimeout(() => b.remove(), 1000);
+    for (let k=0;k<10;k++){ const ang = k/10*TAU, t = document.createElementNS(NS,'text'); t.textContent = '✦'; t.setAttribute('class','spark');
+      t.setAttribute('x',pos[i]); t.setAttribute('y',170); t.style.setProperty('--dx',C(ang)*90+'px'); t.style.setProperty('--dy',S(ang)*90+'px'); svg.append(t); setTimeout(() => t.remove(), 1200); }
+    float(i, `${from} evolved into ${forms[to].name}!`, 'lvl', 0);
+    checkEvolution(i);
+  }, 2200);
+}
+setInterval(save, 3000);
+document.getElementById('feed').onclick = () => { float(sel,'🍎','heart'); addXp(sel,'feed'); hop(sel); };
+document.getElementById('evolve').onclick = () => { const nx = SPECIES[pets[sel].species].forms[pets[sel].form+1]; if (!nx || evo[sel]) return;
+  pets[sel].xp = Math.max(pets[sel].xp, Math.ceil(Growth.xpForLevel(nx.at))); render(); checkEvolution(sel); };
+
+// ---------- send money: sender and receiver meet centre stage, notes and coins arc across, receiver celebrates ----------
+let xfer = null; const TGT = [], TX = [];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const until = (ok, ms = 60) => new Promise(r => { const t = setInterval(() => { if (ok()) { clearInterval(t); r(); } }, ms); });
+// a banknote with a front and a back, so it can flip end over end like the papers in the Windows XP copy dialog
+const NOTE_FRONT = `<rect x="-16" y="-9" width="32" height="18" rx="2.5" fill="#8fd18a" stroke="#4e9a49" stroke-width="1.5"/><rect x="-12.5" y="-5.5" width="25" height="11" rx="1.5" fill="none" stroke="#4e9a49" stroke-width="1" opacity=".6"/><circle r="4.2" fill="#c8ecc4" stroke="#4e9a49" stroke-width="1.2"/><text y="2.6" font-size="7" font-weight="800" text-anchor="middle" fill="#2f6b2b">₹</text>`;
+const NOTE_BACK  = `<rect x="-16" y="-9" width="32" height="18" rx="2.5" fill="#6fb469" stroke="#3f8a3a" stroke-width="1.5"/><path d="M-11 -3 H11 M-11 1 H11 M-11 5 H4" stroke="#3f8a3a" stroke-width="1" opacity=".55"/>`;
+function bodyAt(i){       // world-space size of a pet right now
+  const p = pets[i], A = analyze(SPECIES[p.species].forms[p.form].id), sc = Growth.traits(p.xp, SPECIES[p.species].forms, p.form).scale;
+  return { W:A.W*sc, H:A.H*sc };
+}
+// every note follows the same arc at the same pace (a steady stream, like XP's flying papers),
+// flipping end over end on the way: scaleY = cos(turn) shows the back while it's negative
+function fly(k, a, b, onLand){
+  const el = document.createElementNS(NS,'g');
+  el.innerHTML = `<g class="front">${NOTE_FRONT}</g><g class="back" style="display:none">${NOTE_BACK}</g>`; svg.append(el);
+  const front = el.querySelector('.front'), back = el.querySelector('.back');
+  const t0 = performance.now(), dur = 1150, h = 95, turns = 1.5, dir = Math.sign(b[0] - a[0]) || 1;
+  (function step(now){
+    const u = Math.min(1, (now - t0)/dur), x = a[0] + (b[0] - a[0])*u, y = a[1] + (b[1] - a[1])*u - h*4*u*(1 - u);
+    const flip = C(TAU*turns*u), showBack = flip < 0;
+    front.style.display = showBack ? 'none' : ''; back.style.display = showBack ? '' : 'none';
+    const tilt = dir*(-25 + 50*u), skew = 12*S(TAU*turns*u), lift = 1 + .18*S(Math.PI*u);    // nose up, then down; a little closer mid-flight
+    el.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${tilt.toFixed(1)}) skewX(${skew.toFixed(1)}) scale(${lift.toFixed(3)} ${(lift*Math.max(.08, Math.abs(flip))).toFixed(3)})`);
+    if (u < 1) requestAnimationFrame(step); else { el.remove(); onLand(); }
+  })(t0);
+}
+function burst(x, y, glyphs, n = 12){
+  for (let k = 0; k < n; k++) { const ang = k/n*TAU, t = document.createElementNS(NS,'text'); t.textContent = glyphs[k % glyphs.length]; t.setAttribute('class','spark');
+    t.setAttribute('x', x); t.setAttribute('y', y); t.style.setProperty('--dx', C(ang)*70 + 'px'); t.style.setProperty('--dy', S(ang)*70 + 'px'); svg.append(t); setTimeout(() => t.remove(), 1200); }
+}
+async function sendMoney(from, to, amount){
+  if (xfer || from === to || evo[from] || evo[to]) return;
+  const saved = [pets[from].emotion, pets[to].emotion];
+  xfer = { who:[from, to] }; [from, to].forEach(i => { if (mode[i] !== 'idle' && mode[i] !== 'home') mode[i] = 'home'; });
+  // 1. meet centre stage, sender on the side it already stands
+  const left = pos[from] <= pos[to];
+  TGT[from] = STAGE_W/2 + (left ? -1 : 1)*GAP*.65; TGT[to] = STAGE_W/2 + (left ? 1 : -1)*GAP*.65; mode[from] = mode[to] = 'home'; render();
+  await until(() => mode[from] === 'idle' && mode[to] === 'idle');
+  const side = Math.sign(pos[to] - pos[from]);
+  // 2. wind-up: sender leans back, then throws
+  TX[from] = -side*9; await sleep(380); TX[from] = side*7; hop(from); await sleep(160); TX[from] = 0;
+  // 3. money arcs across; every landing squashes the receiver a little
+  const n = clamp(Math.round(Math.log10(amount + 1)*3), 5, 16), fb = bodyAt(from), tb = bodyAt(to);
+  let landed = 0;
+  for (let k = 0; k < n; k++) {
+    fly(k, [pos[from] + side*fb.W*.42, GROUND - fb.H*.55], [pos[to] - side*tb.W*.1, GROUND - tb.H*.5], () => {
+      landed++; A_[to].catch = .22;
+      if (landed === n) burst(pos[to], GROUND - tb.H*.5, ['✦','₹','✦']);
+    });
+    await sleep(190);   // evenly spaced stream
+  }
+  await until(() => landed === n);
+  // 4. celebrate: receiver happy and hopping, both smiling
+  pets[to].emotion = 'happy'; pets[from].emotion = 'happy'; render(); hop(to);
+  await sleep(2300);
+  // 5. back to normal
+  pets[from].emotion = saved[0]; pets[to].emotion = saved[1]; delete TGT[from]; delete TGT[to];
+  mode[from] = mode[to] = 'home'; xfer = null; render();
+}
+document.getElementById('send').onclick = () => {
+  const from = +document.getElementById('from').value, to = +document.getElementById('to').value, amt = Math.max(1, Math.round(+document.getElementById('amount').value || 0));
+  sendMoney(from, to, amt);
+};
+
+// ---------- main loop ----------
+const setMode = (i, m) => { if (evo[i]) return; mode[i] = (mode[i]===m ? (m==='walk' ? 'home' : 'idle') : m); };
+let last = performance.now();
+(function tick(now){
+  const dt = Math.min((now-last)/1000, .1), t = now/1000; last = now;
+  for (let i=0;i<5;i++){
+    if (!refs[i]) continue;
+    const m = mode[i];
+    if (m==='dance') addXp(i,'dance',dt);
+    if (m==='walk' || m==='home') {
+      addXp(i,'walk',dt);
+      const sp = (GAITS[pets[i].gait] || GAITS.waddle).speed * Growth.traits(pets[i].xp, SPECIES[pets[i].species].forms, pets[i].form).scale;
+      if (m==='walk') { pos[i] += dir[i]*sp*dt; if (pos[i]>STAGE_W-40) { pos[i]=STAGE_W-40; dir[i]=-1; } if (pos[i]<40) { pos[i]=40; dir[i]=1; } }
+      // home: walk back to the slot, or (sp2: twice as fast) to a send-money meet-up point
+      else { const T = TGT[i] ?? XS[i], d = T-pos[i], sp2 = TGT[i] != null ? sp*2 : sp; dir[i] = Math.sign(d)||1; if (Math.abs(d) < sp2*dt) { pos[i]=T; mode[i]='idle'; } else pos[i] += dir[i]*sp2*dt; }
+    }
+    refs[i].el.setAttribute('transform', `translate(${pos[i]} ${GROUND})`);
+    applyPose(i, pose(i, dt, t));
+  }
+  requestAnimationFrame(tick);
+})(last);
+const act = () => render();
+document.getElementById('dance').onclick    = () => { if (mode[sel]==='walk') mode[sel]='home'; setMode(sel,'dance'); act(); };
+document.getElementById('run').onclick      = () => { setMode(sel,'walk'); act(); };
+document.getElementById('danceAll').onclick = () => { const on = mode.some(m=>m!=='dance'); mode.forEach((_,i)=>{ mode[i] = evo[i] ? 'idle' : on ? 'dance' : 'idle'; }); act(); };
+document.getElementById('runAll').onclick   = () => { mode.forEach((_,i)=>{ if (!evo[i]) { mode[i]='walk'; dir[i] = i%2 ? -1 : 1; } }); act(); };
+document.getElementById('stop').onclick     = () => { mode.forEach((m,i)=>mode[i] = m==='walk' ? 'home' : 'idle'); act(); };
+
+// ---------- ui ----------
+document.getElementById('roll').onclick    = () => { pets[sel] = { ...pets[sel], ...roll() }; render(); };
+document.getElementById('rollAll').onclick = () => { pets = pets.map(p => ({ ...p, ...roll() })); render(); };
+// jump straight to an evolution stage: xp is set to that stage's unlock level so it doesn't evolve straight back
+document.getElementById('evostage').onchange = e => { const k = +e.target.value, f = SPECIES[pets[sel].species].forms[k];
+  if (evo[sel]) return; pets[sel] = { ...pets[sel], form:k, xp:Math.ceil(Growth.xpForLevel(f.at)) }; render();
+  g(sel)?.classList.add('pop'); setTimeout(() => g(sel)?.classList.remove('pop'), 1000); };
+document.getElementById('kit').onchange = e => { kit = e.target.value; try { localStorage.frensKit6 = kit; } catch {} SPECIES = speciesFor(kit); render(); };   // same frens and stages, other art
+document.getElementById('species').onchange = e => { const s = +e.target.value; pets[sel] = { ...pets[sel], species:s, form:Growth.traits(pets[sel].xp, SPECIES[s].forms).earned }; render(); };
+const glowBox = document.getElementById('glow');
+const applyLook = () => { document.body.classList.toggle('glow', glow); glowBox.checked = glow; };
+glowBox.onchange = () => { glow = glowBox.checked; try { localStorage.critterLook6 = glow ? 'glow' : 'flat'; } catch {} applyLook(); render(); };
+applyLook();
+// glow sliders: one per knob + an optional single halo colour
+function glowUI(){
+  const box = document.getElementById('glowcfg');
+  box.innerHTML = Object.entries(GLOW_KNOBS).map(([k,[d,lo,hi]]) =>
+      `<label>${k} <input type="range" data-k="${k}" min="${lo}" max="${hi}" step=".05" value="${glowCfg[k]}"><span>${(+glowCfg[k]).toFixed(2)}</span></label>`).join('')
+    + `<label><input type="checkbox" id="tint" ${glowCfg.color ? 'checked' : ''}> tint <input type="color" id="tintc" value="${glowCfg.color || '#ffb347'}"></label>`
+    + `<button id="glowreset">reset</button>`;
+  const saveCfg = () => { try { localStorage.critterGlow6 = JSON.stringify(glowCfg); } catch {} render(); };
+  box.querySelectorAll('input[type=range]').forEach(el => el.oninput = () => { glowCfg[el.dataset.k] = +el.value; el.nextElementSibling.textContent = (+el.value).toFixed(2); saveCfg(); });
+  const tint = box.querySelector('#tint'), tintc = box.querySelector('#tintc');
+  tint.onchange = tintc.oninput = () => { glowCfg.color = tint.checked ? tintc.value : ''; saveCfg(); };
+  box.querySelector('#glowreset').onclick = () => { for (const [k,[d]] of Object.entries(GLOW_KNOBS)) glowCfg[k] = d; glowCfg.color = ''; saveCfg(); glowUI(); };
+}
+glowUI();
+document.getElementById('moods').onclick = () => { pets.forEach(p => p.emotion = pick(EMOTIONS)); render(); };
+for (const k of ['hat','eyes','neck','prop','gait','emotion']) document.getElementById(k).onchange = e => { pets[sel][k] = e.target.value; render(); };
+render();
+</script>
+</body>
+</html>
