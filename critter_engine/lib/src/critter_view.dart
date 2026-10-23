@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import 'catalog.dart';
 import 'composer.dart';
+import 'glow.dart';
 import 'spec.dart';
 
 /// Draws one critter from a [spec]. Static for now (phase 2); the animation layer wraps these layers later.
@@ -13,14 +14,15 @@ import 'spec.dart';
 /// the same frame, so an evolved form renders bigger than a baby one at the same widget size.
 /// Recomposes only when [spec] or [look] changes.
 ///
-/// [look] overrides `spec.look`. [CritterLook.glow] adds shading, gloss, a contact shadow and a colour
-/// halo (a blurred copy of the critter behind it); it reads best on a dark background.
+/// [look] / [glow] override the spec's. [CritterLook.glow] adds shading, gloss, a contact shadow and a colour
+/// halo (a blurred copy of the critter behind it), each tunable through [CritterGlow]; it reads best on a dark background.
 class CritterView extends StatefulWidget {
-  const CritterView({super.key, required this.catalog, required this.spec, this.look});
+  const CritterView({super.key, required this.catalog, required this.spec, this.look, this.glow});
 
   final CritterCatalog catalog;
   final CritterSpec spec;
   final CritterLook? look;
+  final CritterGlow? glow;
 
   @override
   State<CritterView> createState() => _CritterViewState();
@@ -29,12 +31,12 @@ class CritterView extends StatefulWidget {
 class _CritterViewState extends State<CritterView> {
   late CritterComposition? _comp = _compose();
 
-  CritterComposition? _compose() => compose(widget.catalog, widget.spec, look: widget.look);
+  CritterComposition? _compose() => compose(widget.catalog, widget.spec, look: widget.look, glow: widget.glow);
 
   @override
   void didUpdateWidget(CritterView old) {
     super.didUpdateWidget(old);
-    if (old.spec != widget.spec || old.catalog != widget.catalog || old.look != widget.look) _comp = _compose();
+    if (old.spec != widget.spec || old.catalog != widget.catalog || old.look != widget.look || old.glow != widget.glow) _comp = _compose();
   }
 
   @override
@@ -47,12 +49,13 @@ class _CritterViewState extends State<CritterView> {
       aspectRatio: vb.width / vb.height,
       child: LayoutBuilder(
         builder: (context, box) => Stack(fit: StackFit.expand, children: [
-          if (comp.look == CritterLook.glow)
-            // halo: the critter itself, blurred and brightened, behind the sharp copy
+          if (comp.look == CritterLook.glow && comp.glow.hasHalo)
+            // halo: the critter itself, blurred and brightened (or tinted), behind the sharp copy
             ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: box.maxWidth * .03, sigmaY: box.maxWidth * .03, tileMode: TileMode.decal),
+              imageFilter: ImageFilter.blur(
+                  sigmaX: box.maxWidth * .03 * comp.glow.blur, sigmaY: box.maxWidth * .03 * comp.glow.blur, tileMode: TileMode.decal),
               child: ColorFiltered(
-                colorFilter: const ColorFilter.matrix([1.35, 0, 0, 0, 18, 0, 1.35, 0, 0, 18, 0, 0, 1.35, 0, 18, 0, 0, 0, .85, 0]),
+                colorFilter: ColorFilter.matrix(_haloMatrix(comp.glow)),
                 child: Stack(fit: StackFit.expand, children: [layer(comp.base), layer(comp.overlay)]),
               ),
             ),
@@ -61,4 +64,16 @@ class _CritterViewState extends State<CritterView> {
       ),
     );
   }
+}
+
+/// Brighten the critter's own colours, or paint everything in [CritterGlow.color]; alpha scaled by halo.
+List<double> _haloMatrix(CritterGlow g) {
+  final c = g.color;
+  if (c != null) {
+    final v = int.parse(c.substring(1), radix: 16);
+    final r = ((v >> 16) & 255).toDouble(), gr = ((v >> 8) & 255).toDouble(), b = (v & 255).toDouble();
+    return [0, 0, 0, 0, r, 0, 0, 0, 0, gr, 0, 0, 0, 0, b, 0, 0, 0, g.halo, 0];
+  }
+  final k = g.brightness, lift = (k - 1) * 51; // 1.35 -> +18, as before
+  return [k, 0, 0, 0, lift, 0, k, 0, 0, lift, 0, 0, k, 0, lift, 0, 0, 0, g.halo, 0];
 }

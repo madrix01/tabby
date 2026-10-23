@@ -72,6 +72,26 @@ void main() {
     expect(CritterSpec.fromJson({'species': 'blip', 'look': 'neon'}).look, CritterLook.flat, reason: 'unknown look falls back');
   });
 
+  test('glow knobs: parsed with defaults and clamps, and each one switches its effect', () {
+    final g = CritterSpec.fromJson({'species': 'blip', 'look': 'glow', 'glow': {'halo': 3, 'blur': -1, 'shadow': 0, 'color': 'orange'}}).glow;
+    expect(g.halo, 1, reason: 'clamped');
+    expect(g.blur, 0, reason: 'clamped');
+    expect(g.hasHalo, isFalse);
+    expect(g.color, isNull, reason: 'only #rrggbb accepted');
+    expect(g.gloss, const CritterGlow().gloss, reason: 'missing keeps default');
+    const spec = CritterSpec(species: 'pip', form: 2, look: CritterLook.glow);
+    expect(CritterSpec.fromJson(spec.copyWith(glow: const CritterGlow(halo: .4, color: '#ff8a3d')).toJson()).glow,
+        const CritterGlow(halo: .4, color: '#ff8a3d'));
+    String base(CritterGlow g) => compose(catalog, spec, glow: g)!.base;
+    expect(base(const CritterGlow()), contains('fill="url(#sh)"'));
+    expect(base(const CritterGlow(shadow: 0)), isNot(contains('fill="url(#sh)"')));
+    expect(base(const CritterGlow()), contains('fill="url(#hl)"'));
+    expect(base(const CritterGlow(gloss: 0)), isNot(contains('fill="url(#hl)"')));
+    final fill = catalog.characters['15']!.skin.first.fill;
+    expect(base(const CritterGlow(shading: 0)), contains('<stop offset="0" stop-color="$fill"/>'), reason: 'no shading = flat colour');
+    expect(compose(catalog, spec, glow: const CritterGlow(gloss: 0))!.eyes, isNot(contains('#ffffff')), reason: 'no eye glints without gloss');
+  });
+
   test('items land in the right layer, neck under eyewear under hat', () {
     final comp = compose(catalog, const CritterSpec(species: 'pip', form: 2,
         attachments: CritterAttachments(hat: 'crown', eyes: 'round', neck: 'bow_tie', prop: 'gold_bar')))!;

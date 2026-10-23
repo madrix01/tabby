@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'glow.dart';
 import 'item.dart';
 
 /// What the backend sends to describe one critter. Tolerant by design: unknown or
@@ -10,6 +11,7 @@ import 'item.dart';
 ///   "v": 1,
 ///   "species": "blip", "form": 1, "xp": 230,
 ///   "look": "glow",
+///   "glow": { "halo": 0.85, "blur": 1, "shading": 1, "gloss": 1, "shadow": 1 },
 ///   "attachments": { "hat": "crown", "eyes": "goggles", "neck": "gold_chain", "prop": "gold_bar" },
 ///   "behaviour": { "likesPets": true, "gait": "waddle", "state": "idle" },
 ///   "items": [ { "id": "viking", "slot": "hat", "svg": "…", "anchor": [50, 62] } ]
@@ -27,6 +29,7 @@ class CritterSpec {
     this.behaviour = const CritterBehaviour(),
     this.items = const [],
     this.look = CritterLook.flat,
+    this.glow = const CritterGlow(),
   });
 
   final String species;
@@ -45,6 +48,9 @@ class CritterSpec {
   /// How the critter is lit. `CritterView(look: …)` overrides it.
   final CritterLook look;
 
+  /// Tuning for the glow look; ignored when [look] is flat.
+  final CritterGlow glow;
+
   factory CritterSpec.fromJson(Map<String, dynamic> j) => CritterSpec(
         species: j['species'] as String? ?? '',
         form: (j['form'] as num?)?.toInt() ?? 0,
@@ -55,6 +61,7 @@ class CritterSpec {
           for (final raw in j['items'] as List? ?? const []) ?_tryItem(raw),
         ],
         look: CritterLook.parse(j['look']),
+        glow: CritterGlow.fromJson(j['glow'] as Map<String, dynamic>? ?? const {}),
       );
 
   static CritterItem? _tryItem(Object? raw) {
@@ -75,9 +82,10 @@ class CritterSpec {
         'behaviour': behaviour.toJson(),
         if (items.isNotEmpty) 'items': items.map((i) => i.toJson()).toList(),
         if (look != CritterLook.flat) 'look': look.name,
+        if (glow != const CritterGlow()) 'glow': glow.toJson(),
       };
 
-  CritterSpec copyWith({String? species, int? form, double? xp, CritterAttachments? attachments, CritterBehaviour? behaviour, List<CritterItem>? items, CritterLook? look}) =>
+  CritterSpec copyWith({String? species, int? form, double? xp, CritterAttachments? attachments, CritterBehaviour? behaviour, List<CritterItem>? items, CritterLook? look, CritterGlow? glow}) =>
       CritterSpec(
         species: species ?? this.species,
         form: form ?? this.form,
@@ -86,15 +94,16 @@ class CritterSpec {
         behaviour: behaviour ?? this.behaviour,
         items: items ?? this.items,
         look: look ?? this.look,
+        glow: glow ?? this.glow,
       );
 
   @override
   bool operator ==(Object other) =>
       other is CritterSpec && other.species == species && other.form == form && other.xp == xp &&
-      other.attachments == attachments && other.behaviour == behaviour && listEquals(other.items, items) && other.look == look;
+      other.attachments == attachments && other.behaviour == behaviour && listEquals(other.items, items) && other.look == look && other.glow == glow;
 
   @override
-  int get hashCode => Object.hash(species, form, xp, attachments, behaviour, Object.hashAll(items), look);
+  int get hashCode => Object.hash(species, form, xp, attachments, behaviour, Object.hashAll(items), look, glow);
 }
 
 /// Item id per slot; null means nothing in that slot. Ids that the catalog doesn't know are skipped at render time.

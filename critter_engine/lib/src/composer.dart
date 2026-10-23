@@ -1,6 +1,7 @@
 import 'dart:ui' show Rect;
 
 import 'catalog.dart';
+import 'glow.dart';
 import 'growth.dart';
 import 'item.dart';
 import 'placement.dart';
@@ -24,6 +25,7 @@ class CritterComposition {
     required this.scale,
     required this.eyeLineY,
     required this.look,
+    required this.glow,
   });
 
   /// Shared by every critter so sizes stay comparable (a final form is visibly bigger than a first one).
@@ -41,12 +43,15 @@ class CritterComposition {
 
   /// The look these layers were built for; the widget adds the halo for [CritterLook.glow].
   final CritterLook look;
+
+  /// Glow tuning these layers were built with (the widget reads the halo knobs).
+  final CritterGlow glow;
 }
 
 /// Spec -> layers. Returns null when the species is unknown (callers render nothing).
 /// Item ids resolve against the spec's own items, then the catalog; unknown ids are skipped. Forms are clamped.
-/// [look] overrides the spec's look.
-CritterComposition? compose(CritterCatalog catalog, CritterSpec spec, {CritterLook? look}) {
+/// [look] and [glow] override the spec's.
+CritterComposition? compose(CritterCatalog catalog, CritterSpec spec, {CritterLook? look, CritterGlow? glow}) {
   final species = catalog.species[spec.species];
   if (species == null) return null;
   final formIndex = spec.form.clamp(0, species.forms.length - 1);
@@ -54,7 +59,7 @@ CritterComposition? compose(CritterCatalog catalog, CritterSpec spec, {CritterLo
   final c = catalog.characters[form.character];
   if (c == null) return null;
   final scale = formScale(species, formIndex, spec.xp);
-  final ink = catalog.inkColor, a = spec.attachments, glow = (look ?? spec.look) == CritterLook.glow;
+  final ink = catalog.inkColor, a = spec.attachments, lit = (look ?? spec.look) == CritterLook.glow, tune = glow ?? spec.glow;
 
   String rule(String? r) => r == null ? '' : ' fill-rule="$r"';
   String mark(InkPart p) => p.d != null
@@ -67,14 +72,14 @@ CritterComposition? compose(CritterCatalog catalog, CritterSpec spec, {CritterLo
   }
 
   final base = StringBuffer();
-  if (glow) {
-    base.write(_glowBody(c));
+  if (lit) {
+    base.write(_glowBody(c, tune));
   } else {
     base.writeAll(c.skin.map((p) => '<path d="${p.d}" fill="${p.fill}"${rule(p.fillRule)}/>'));
   }
   base.writeAll(c.ink.where((p) => !p.eye).map(mark));
   // glossy eyes: a small glint on round eyes
-  String eye(InkPart p) => mark(p) + (glow && p.d == null ? '<circle cx="${n2(p.cx + p.r * .32)}" cy="${n2(p.cy - p.r * .32)}" r="${n2(p.r * .32)}" fill="#ffffff"/>' : '');
+  String eye(InkPart p) => mark(p) + (lit && tune.gloss > 0 && p.d == null ? '<circle cx="${n2(p.cx + p.r * .32)}" cy="${n2(p.cy - p.r * .32)}" r="${n2(p.r * .32)}" fill="#ffffff"/>' : '');
   final overlay = placed('neck', a.neck) + placed('eyes', a.eyes) + placed('hat', a.hat);
   final prop = placed('prop', a.prop);
 
@@ -92,30 +97,33 @@ CritterComposition? compose(CritterCatalog catalog, CritterSpec spec, {CritterLo
     form: form,
     scale: scale,
     eyeLineY: c.anchors.eye.dy * scale,
-    look: glow ? CritterLook.glow : CritterLook.flat,
+    look: lit ? CritterLook.glow : CritterLook.flat,
+    glow: tune,
   );
 }
 
 /// Lit body: each part shaded light top-left to dark bottom-right, a glossy highlight clipped to the body,
 /// and a soft contact shadow under the feet. Gradients only; the halo is a Flutter blur in CritterView.
-String _glowBody(CritterCharacter c) {
+String _glowBody(CritterCharacter c, CritterGlow g) {
   final w = c.width, h = c.height, out = StringBuffer('<defs>');
   for (final (k, p) in c.skin.indexed) {
     out.write('<radialGradient id="g$k" cx="0.36" cy="0.28" r="0.95">'
-        '<stop offset="0" stop-color="${_shade(p.fill, .38)}"/><stop offset="0.5" stop-color="${p.fill}"/>'
-        '<stop offset="1" stop-color="${_shade(p.fill, -.35)}"/></radialGradient>');
+        '<stop offset="0" stop-color="${_shade(p.fill, .38 * g.shading)}"/><stop offset="0.5" stop-color="${p.fill}"/>'
+        '<stop offset="1" stop-color="${_shade(p.fill, -.35 * g.shading)}"/></radialGradient>');
   }
   out
-    ..write('<radialGradient id="sh"><stop offset="0" stop-color="#000000" stop-opacity="0.55"/><stop offset="1" stop-color="#000000" stop-opacity="0"/></radialGradient>')
-    ..write('<radialGradient id="hl"><stop offset="0" stop-color="#ffffff" stop-opacity="0.6"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>')
-    ..write('<clipPath id="body">${c.skin.map((p) => '<path d="${p.d}"/>').join()}</clipPath></defs>')
-    ..write('<ellipse cx="0" cy="1" rx="${n2(w * .55)}" ry="${n2(5 + w * .03)}" fill="url(#sh)"/>');
+    ..write('<radialGradient id="sh"><stop offset="0" stop-color="#000000" stop-opacity="${n2((.55 * g.shadow).clamp(0, 1))}"/><stop offset="1" stop-color="#000000" stop-opacity="0"/></radialGradient>')
+    ..write('<radialGradient id="hl"><stop offset="0" stop-color="#ffffff" stop-opacity="${n2((.6 * g.gloss).clamp(0, 1))}"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>')
+    ..write('<clipPath id="body">${c.skin.map((p) => '<path d="${p.d}"/>').join()}</clipPath></defs>');
+  if (g.shadow > 0) out.write('<ellipse cx="0" cy="1" rx="${n2(w * .55)}" ry="${n2(5 + w * .03)}" fill="url(#sh)"/>');
   for (final (k, p) in c.skin.indexed) {
     out.write('<path d="${p.d}" fill="url(#g$k)"${p.fillRule == null ? '' : ' fill-rule="${p.fillRule}"'}/>');
   }
   final hx = -w * .2, hy = -h * .72;
-  out.write('<g clip-path="url(#body)"><ellipse cx="${n2(hx)}" cy="${n2(hy)}" rx="${n2(w * .15)}" ry="${n2(h * .12)}" '
-      'transform="rotate(-25 ${n2(hx)} ${n2(hy)})" fill="url(#hl)"/></g>');
+  if (g.gloss > 0) {
+    out.write('<g clip-path="url(#body)"><ellipse cx="${n2(hx)}" cy="${n2(hy)}" rx="${n2(w * .15)}" ry="${n2(h * .12)}" '
+        'transform="rotate(-25 ${n2(hx)} ${n2(hy)})" fill="url(#hl)"/></g>');
+  }
   return out.toString();
 }
 

@@ -85,6 +85,29 @@ void main() {
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/glow.png'));
   });
 
+  testWidgets('glow knobs', (tester) async {
+    tester.view.physicalSize = const Size(1200, 330);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    const spec = CritterSpec(species: 'pip', form: 2, look: CritterLook.glow, attachments: CritterAttachments(hat: 'crown'));
+    final cells = [
+      for (final g in const [
+        CritterGlow(),                                              // default
+        CritterGlow(halo: 0),                                       // shading + gloss + shadow only
+        CritterGlow(halo: 1, blur: 2.2, color: '#ffb347'),          // big warm stage light
+        CritterGlow(shading: 0, gloss: 0, shadow: 0, blur: .6),     // flat colours, tight halo
+      ])
+        CritterView(catalog: catalog, spec: spec, glow: g),
+    ];
+    await tester.pumpWidget(MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: ColoredBox(color: const Color(0xff1a1512),
+          child: GridView.count(crossAxisCount: 4, childAspectRatio: 4 / 3, padding: const EdgeInsets.all(8), children: cells)),
+    ));
+    await settle(tester);
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/glow_knobs.png'));
+  });
+
   testWidgets('items sent as JSON', (tester) async {
     tester.view.physicalSize = const Size(1200, 330);
     tester.view.devicePixelRatio = 1;

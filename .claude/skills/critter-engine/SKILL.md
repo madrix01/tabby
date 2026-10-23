@@ -85,6 +85,7 @@ SizedBox(
 | `attachments` | One item id per slot: `hat`, `eyes`, `neck`, `prop`. A missing slot means empty. |
 | `behaviour` | Parsed and carried through, but not used for rendering yet (reserved for animation). |
 | `look` | `"flat"` (default) or `"glow"`: shaded glossy bodies, eye glints, a contact shadow and a colour halo. Use it on dark backgrounds. `CritterView(look: CritterLook.glow)` overrides the spec. |
+| `glow` | Optional tuning for the glow look: `halo` 0–1, `blur` 0–3, `brightness` 1–2, `shading` / `gloss` / `shadow` 0–1.5 (0 = off), and `color` `#rrggbb` to tint the halo. Values are clamped and missing knobs keep their defaults. `CritterView(glow: CritterGlow(...))` overrides it. |
 | `items` | Optional inline item definitions; see section 5. |
 
 Missing fields get defaults, and unknown ids are ignored. Values of the wrong type, such as `"form": "2"`, do throw, so send numbers as numbers.

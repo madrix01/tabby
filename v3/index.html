@@ -41,6 +41,10 @@
   /* glow look: dark stage with a spotlight from above (same lighting as the Flutter engine's CritterLook.glow) */
   body.glow { --ink:#f3ece4; background:radial-gradient(ellipse 70% 90% at 50% -12%, #6b5a48 0%, #221c18 55%, #0e0c0b 100%); }
   body.glow select { background:#1c1714; }
+  #glowcfg { display:none; min-width:100%; justify-content:center; flex-wrap:wrap; gap:6px 16px; font:600 13px var(--sans); }
+  body.glow #glowcfg { display:flex; }
+  #glowcfg label { display:flex; align-items:center; gap:6px; }
+  #glowcfg input[type=range] { width:90px; accent-color:#f6c945; }
   #look { display:flex; gap:6px; align-items:center; font:600 14px var(--sans); cursor:pointer; }
   #name { font-weight:800; min-width:100%; text-align:center; letter-spacing:.2em; text-transform:uppercase; }
 </style>
@@ -58,6 +62,7 @@
     <select id="prop"></select>
     <select id="gait"></select>
     <label id="look"><input type="checkbox" id="glow"> Glow</label>
+    <div id="glowcfg"></div>
     <button id="roll">Reroll this one</button>
     <button id="rollAll">Reroll all</button>
     <span style="min-width:100%"></span>
@@ -223,25 +228,33 @@ const save = () => { try { localStorage.critters1 = JSON.stringify(pets); } catc
 const svg = document.getElementById('svg'), hearts = {}, hover = new Set(), evo = {}, refs = [];
 // ---------- glow look: shaded bodies, gloss, eye glints, contact shadow, colour halo ----------
 let glow = false; try { glow = localStorage.critterLook === 'glow'; } catch {}
+// same knobs as the Flutter engine's CritterGlow: multipliers where 1 = default and 0 = off
+const GLOW_KNOBS = { halo:[.85,0,1], blur:[1,0,3], brightness:[1.35,1,2], shading:[1,0,1.5], gloss:[1,0,1.5], shadow:[1,0,1.5] };
+let glowCfg = Object.fromEntries(Object.entries(GLOW_KNOBS).map(([k,[d]]) => [k, d])); glowCfg.color = '';
+try { Object.assign(glowCfg, JSON.parse(localStorage.critterGlow || '{}')); } catch {}
 function shade(hex, t){                  // mix #rrggbb towards white (t > 0) or black (t < 0)
   const m = /^#([0-9a-f]{6})$/i.exec(hex); if (!m) return hex;
   const v = parseInt(m[1], 16), to = t > 0 ? 255 : 0, f = Math.abs(t);
   return '#' + [16, 8, 0].map(sh => { const x = (v >> sh) & 255; return Math.round(x + (to - x)*f).toString(16).padStart(2, '0'); }).join('');
 }
 function glowParts(i, c, A){
-  const fillOf = e => (/fill="([^"]+)"/.exec(e) || [])[1], into = `scale(${A.s0}) translate(${-A.cx} ${-A.bot})`;
-  const defs = c.skin.map((e, k) => `<radialGradient id="g${i}_${k}" cx=".36" cy=".28" r=".95"><stop offset="0" stop-color="${shade(fillOf(e), .38)}"/><stop offset=".5" stop-color="${fillOf(e)}"/><stop offset="1" stop-color="${shade(fillOf(e), -.35)}"/></radialGradient>`).join('')
-    + `<radialGradient id="sh${i}"><stop offset="0" stop-color="#000" stop-opacity=".6"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>`
-    + `<radialGradient id="hl${i}"><stop offset="0" stop-color="#fff" stop-opacity=".6"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>`
+  const g = glowCfg, fillOf = e => (/fill="([^"]+)"/.exec(e) || [])[1], into = `scale(${A.s0}) translate(${-A.cx} ${-A.bot})`;
+  const lift = (g.brightness - 1)*.2;   // 1.35 -> +.07, as in the engine
+  const halo = g.color
+    ? (([r,gr,b]) => `0 0 0 0 ${r}  0 0 0 0 ${gr}  0 0 0 0 ${b}  0 0 0 ${g.halo} 0`)([1,3,5].map(k => parseInt(g.color.slice(k,k+2),16)/255))
+    : `${g.brightness} 0 0 0 ${lift}  0 ${g.brightness} 0 0 ${lift}  0 0 ${g.brightness} 0 ${lift}  0 0 0 ${g.halo} 0`;
+  const defs = c.skin.map((e, k) => `<radialGradient id="g${i}_${k}" cx=".36" cy=".28" r=".95"><stop offset="0" stop-color="${shade(fillOf(e), .38*g.shading)}"/><stop offset=".5" stop-color="${fillOf(e)}"/><stop offset="1" stop-color="${shade(fillOf(e), -.35*g.shading)}"/></radialGradient>`).join('')
+    + `<radialGradient id="sh${i}"><stop offset="0" stop-color="#000" stop-opacity="${Math.min(1, .6*g.shadow)}"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>`
+    + `<radialGradient id="hl${i}"><stop offset="0" stop-color="#fff" stop-opacity="${Math.min(1, .6*g.gloss)}"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>`
     + `<clipPath id="cp${i}" transform="${into}">${c.skin.join('')}</clipPath>`
-    + `<filter id="halo${i}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="${(A.W*.06 + 3).toFixed(1)}"/><feColorMatrix type="matrix" values="1.35 0 0 0 .07  0 1.35 0 0 .07  0 0 1.35 0 .07  0 0 0 .85 0"/></filter>`;
+    + `<filter id="halo${i}" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="${((A.W*.06 + 3)*g.blur).toFixed(1)}"/><feColorMatrix type="matrix" values="${halo}"/></filter>`;
   const skin = c.skin.map((e, k) => e.replace(/fill="[^"]+"/, `fill="url(#g${i}_${k})"`)).join('');
   const hx = -A.W*.2, hy = -A.H*.72;
-  const gloss = `<g clip-path="url(#cp${i})"><ellipse cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" rx="${(A.W*.15).toFixed(1)}" ry="${(A.H*.12).toFixed(1)}" transform="rotate(-25 ${hx.toFixed(1)} ${hy.toFixed(1)})" fill="url(#hl${i})"/></g>`;
-  const glint = e => { const m = /<circle[^>]*cx="([-\d.]+)"[^>]*cy="([-\d.]+)"[^>]*r="([-\d.]+)"/.exec(e); if (!m) return '';
+  const gloss = g.gloss > 0 ? `<g clip-path="url(#cp${i})"><ellipse cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" rx="${(A.W*.15).toFixed(1)}" ry="${(A.H*.12).toFixed(1)}" transform="rotate(-25 ${hx.toFixed(1)} ${hy.toFixed(1)})" fill="url(#hl${i})"/></g>` : '';
+  const glint = e => { const m = g.gloss > 0 && /<circle[^>]*cx="([-\d.]+)"[^>]*cy="([-\d.]+)"[^>]*r="([-\d.]+)"/.exec(e); if (!m) return '';
     const [x, y, r] = m.slice(1).map(Number); return `<circle cx="${x + r*.32}" cy="${y - r*.32}" r="${r*.32}" fill="#fff"/>`; };
-  const shadow = `<ellipse class="shadow" cx="0" cy="1" rx="${(A.W*.55).toFixed(1)}" ry="${(5 + A.W*.03).toFixed(1)}" fill="url(#sh${i})"/>`;
-  return { defs, skin, gloss, glint, shadow, into };
+  const shadow = g.shadow > 0 ? `<ellipse class="shadow" cx="0" cy="1" rx="${(A.W*.55).toFixed(1)}" ry="${(5 + A.W*.03).toFixed(1)}" fill="url(#sh${i})"/>` : '<ellipse class="shadow" rx="0" ry="0"/>';
+  return { defs, skin, gloss, glint, shadow, into, halo: g.halo > 0 && g.blur > 0 };
 }
 
 function petSVG(p, i){
@@ -255,7 +268,7 @@ function petSVG(p, i){
     <g class="grow" transform="scale(${t.scale.toFixed(3)})"><g class="pw">
       ${G ? G.shadow : `<ellipse class="shadow" cx="0" cy="1" rx="${(A.W*.42).toFixed(1)}" ry="4" fill="#000" opacity=".08"/>`}
       <g class="body">
-        ${G ? `<g filter="url(#halo${i})"><g transform="${G.into}">${skin}</g>${items}</g>` : ''}
+        ${G?.halo ? `<g filter="url(#halo${i})"><g transform="${G.into}">${skin}</g>${items}</g>` : ''}
         <g transform="scale(${A.s0}) translate(${-A.cx} ${-A.bot})">${skin}${ink}</g>
         ${G ? G.gloss : ''}
         ${items}
@@ -398,6 +411,20 @@ const glowBox = document.getElementById('glow');
 const applyLook = () => { document.body.classList.toggle('glow', glow); glowBox.checked = glow; };
 glowBox.onchange = () => { glow = glowBox.checked; try { localStorage.critterLook = glow ? 'glow' : 'flat'; } catch {} applyLook(); render(); };
 applyLook();
+// glow sliders: one per knob + an optional single halo colour
+function glowUI(){
+  const box = document.getElementById('glowcfg');
+  box.innerHTML = Object.entries(GLOW_KNOBS).map(([k,[d,lo,hi]]) =>
+      `<label>${k} <input type="range" data-k="${k}" min="${lo}" max="${hi}" step=".05" value="${glowCfg[k]}"><span>${(+glowCfg[k]).toFixed(2)}</span></label>`).join('')
+    + `<label><input type="checkbox" id="tint" ${glowCfg.color ? 'checked' : ''}> tint <input type="color" id="tintc" value="${glowCfg.color || '#ffb347'}"></label>`
+    + `<button id="glowreset">reset</button>`;
+  const saveCfg = () => { try { localStorage.critterGlow = JSON.stringify(glowCfg); } catch {} render(); };
+  box.querySelectorAll('input[type=range]').forEach(el => el.oninput = () => { glowCfg[el.dataset.k] = +el.value; el.nextElementSibling.textContent = (+el.value).toFixed(2); saveCfg(); });
+  const tint = box.querySelector('#tint'), tintc = box.querySelector('#tintc');
+  tint.onchange = tintc.oninput = () => { glowCfg.color = tint.checked ? tintc.value : ''; saveCfg(); };
+  box.querySelector('#glowreset').onclick = () => { for (const [k,[d]] of Object.entries(GLOW_KNOBS)) glowCfg[k] = d; glowCfg.color = ''; saveCfg(); glowUI(); };
+}
+glowUI();
 for (const k of ['hat','eyes','neck','prop','gait']) document.getElementById(k).onchange = e => { pets[sel][k] = e.target.value; render(); };
 render();
 </script>

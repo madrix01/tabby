@@ -34,7 +34,24 @@ Set `"look": "glow"` in the spec, or pass `CritterView(look: CritterLook.glow)` 
 - a soft contact shadow under the feet
 - a colour halo: a blurred, brightened copy of the critter drawn behind it, so a flame glows orange and a blue body glows blue
 
-It reads best on a dark background. The background or stage is the host app's job; see the `glow` golden for a spotlight example. `flat` is the default, and unknown values fall back to it.
+Every part can be tuned with an optional `glow` object, or with `CritterView(glow: CritterGlow(...))`:
+
+```json
+"look": "glow",
+"glow": { "halo": 0.85, "blur": 1, "brightness": 1.35, "shading": 1, "gloss": 1, "shadow": 1, "color": "#ffb347" }
+```
+
+| knob | default | range | what it changes |
+|---|---|---|---|
+| `halo` | 0.85 | 0–1 | how opaque the halo is (0 = no halo) |
+| `blur` | 1 | 0–3 | how big the halo is |
+| `brightness` | 1.35 | 1–2 | how much brighter than the critter the halo is |
+| `shading` | 1 | 0–1.5 | strength of the light-to-dark body shading (0 = flat colour) |
+| `gloss` | 1 | 0–1.5 | the highlight and the eye glints |
+| `shadow` | 1 | 0–1.5 | the contact shadow |
+| `color` | none | `#rrggbb` | paints the halo in one colour (e.g. a warm stage light) instead of the critter's own colours |
+
+Out-of-range values are clamped, and missing knobs keep their defaults. The `glow_knobs` golden shows four presets. Glow reads best on a dark background. The background or stage is the host app's job; see the `glow` golden for a spotlight example. `flat` is the default, and unknown values fall back to it.
 
 ## Items as JSON
 
