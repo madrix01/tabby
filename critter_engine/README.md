@@ -69,6 +69,20 @@ Every part can be tuned with an optional `glow` object, or with `CritterView(glo
 
 Out-of-range values are clamped, and missing knobs keep their defaults. The `glow_knobs` golden shows four presets. Glow reads best on a dark background. The background or stage is the host app's job; see the `glow` golden for a spotlight example. `flat` is the default, and unknown values fall back to it.
 
+## Send money
+
+```dart
+MoneyTransferView(catalog: catalog, from: senderSpec, to: receiverSpec, amount: 5000, onComplete: showReceipt)
+```
+
+- **Layout:** two critters side by side. There is no walking.
+- **The cash:** notes stream across like the papers in the Windows XP copy dialog, flipping end over end. Cash only.
+- **Faces:** both stay at their normal face until the money lands, then both turn happy and stay happy.
+- **Labels:** `-₹5,000` and `+₹5,000`, with Indian digit grouping.
+- **Hooks:** `onNoteLanded(landed, total)` and `onComplete`.
+- **Tuning:** `noteCount`, `noteInterval`, `flightDuration` and `currencySymbol` can be changed.
+- **Replay and motion settings:** give it a new key to replay. It respects the OS reduce-motion setting.
+
 ## Items as JSON
 
 | slot | fields |

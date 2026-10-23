@@ -1,6 +1,6 @@
 ---
 name: critter-engine
-description: Add and use the critter_engine Flutter package (github.com/madrix01/tabby) to render evolving pet critters with hats, eyewear, neck items and props from a JSON spec. Use when installing critter_engine, rendering a CritterView, building or validating critter JSON payloads (species, form, attachments, inline items), defining custom items as JSON, using the glow look (glow, halo, shadow, shading), setting a mood (happy, sad, food, entertainment, travel, shopping), or adding new characters or items to the catalog.
+description: Add and use the critter_engine Flutter package (github.com/madrix01/tabby) to render evolving pet critters with hats, eyewear, neck items and props from a JSON spec. Use when installing critter_engine, rendering a CritterView, building or validating critter JSON payloads (species, form, attachments, inline items), defining custom items as JSON, using the glow look (glow, halo, shadow, shading), setting a mood (happy, sad, food, entertainment, travel, shopping), playing the send-money animation between two critters (MoneyTransferView), or adding new characters or items to the catalog.
 ---
 
 # critter_engine
@@ -227,13 +227,55 @@ Tips:
 - **Tuning by eye:** `v3/index.html` in the repo has a **Glow** toggle with live sliders for every knob, and it uses the same defaults. Tune it there, then copy the numbers into your JSON.
 - **Bad values:** they are safe. Out-of-range numbers are clamped, and an invalid `color` is ignored.
 
-## 8. Limits to know before building on it
-- **No animation yet.** `CritterView` is static. Gaits, blinking, petting, dancing and the evolution flash exist in the browser prototype (`v3/index.html`) and are planned for the package. `behaviour` is parsed for that future use.
+## 8. Send money animation
+
+`MoneyTransferView` plays a payment between two critters. Pass the sender's and the receiver's specs, the same JSON as above:
+
+```dart
+MoneyTransferView(
+  key: ValueKey(txnId),                                   // a new key replays it
+  catalog: catalog,
+  from: CritterSpec.fromJson(senderJson),
+  to: CritterSpec.fromJson(receiverJson),
+  amount: 5000,                                           // shown as -₹5,000 / +₹5,000
+  onNoteLanded: (landed, total) => HapticFeedback.selectionClick(),
+  onComplete: () => showReceipt(),
+)
+```
+
+What it does, in order:
+1. **Layout:** the two critters stand side by side, sender on the left and receiver on the right, at a fixed 2:1 width layout. There is no walking.
+2. **Faces:** both show their **normal** face. Any `mood` in the specs is ignored until the money has landed.
+3. **Wind-up:** the sender leans back and lunges forward with a small hop, and `-₹5,000` appears above it in red.
+4. **The cash:** banknotes stream from the sender to the receiver like the papers in the Windows XP copy dialog. They follow the same arc at an even pace and flip end over end, showing a printed front and a plain back. Cash only, no coins.
+5. **Catching:** the receiver squashes a little on every catch.
+6. **Ending:** when the last note lands, **both turn happy and stay happy**. The receiver hops, and `+₹5,000` appears above it in green. `onComplete` fires about 1.3 s later.
+
+| param | default | notes |
+|---|---|---|
+| `from`, `to` | required | Full critter specs (species, form, items, look). Their moods are overridden: normal, then happy. |
+| `amount` | required | Formatted with Indian digit grouping (`12,34,567.50`; decimals only when present). `formatIndian()` is exported. |
+| `currencySymbol` | `₹` | Printed in front of the amount. |
+| `noteCount` | grows with the amount | 5 notes for small sums, up to 16 for large ones. |
+| `noteInterval` | 190 ms | The gap between notes. |
+| `flightDuration` | 1150 ms | How long each note is in the air. |
+| `onNoteLanded(landed, total)` | | Fires once per note; useful for haptics or sound. |
+| `onComplete` | | Fires once, after the celebration. |
+
+Notes:
+- **Total time:** about 4.3 s for ₹500 (8 notes), from wind-up to `onComplete`.
+- **Replay:** it plays once when it appears. To play it again, give it a new `Key`.
+- **Reduce motion:** with the OS "reduce motion" setting on, it jumps straight to the happy ending and calls `onComplete` immediately.
+- **Unknown species:** if either species id is unknown, it renders nothing.
+- **Golden tests:** under `flutter test` the labels render in the test font, as boxes. On a device they use the app's font.
+
+## 9. Limits to know before building on it
+- **Only the send-money animation moves.** `CritterView` itself is static: gaits, blinking, petting, dancing, the mood effects and the evolution flash exist in the browser prototype (`v3/index.html`) and are still planned for the package. `behaviour` is parsed for that future use.
 - **One item per slot.** A critter can't hold a money bag and a gold bar at once.
-- **Art comes from the catalog.** New characters need the compiler (section 9); they can't be sent as JSON.
+- **Art comes from the catalog.** New characters need the compiler (section 10); they can't be sent as JSON.
 - **Two-headed character 23** (Twinny in the `ember` line): it gets its hat between the heads and its glasses spanning both.
 
-## 9. Adding characters or bundled items (repo maintainers)
+## 10. Adding characters or bundled items (repo maintainers)
 
 ```bash
 cd compiler && npm install && npm run build   # rebuilds critter_engine/assets/critter_catalog.json
