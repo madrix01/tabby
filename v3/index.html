@@ -12,7 +12,14 @@
   h1 { margin:0; font:800 1.3rem var(--sans); letter-spacing:.28em; text-transform:uppercase; }
   #stage { width:min(98vw,1040px); }
   svg { width:100%; height:auto; overflow:visible; display:block; }
-  .pet { cursor:pointer; }
+  .pet { cursor:pointer; transition:opacity .4s; }
+  .pet.dim { opacity:.15; }
+  .pet.dim .label, .pet.dim .sel-mark { display:none; }
+  .paid  { font:800 22px var(--sans); fill:#2f9e44; text-anchor:middle; pointer-events:none; animation:rise 2.2s ease-out forwards; }
+  .spent { font:800 18px var(--sans); fill:#e8494b; text-anchor:middle; pointer-events:none; animation:rise 1.8s ease-out forwards; }
+  @keyframes rise { 0% { transform:translateY(8px); opacity:0; } 15% { transform:translateY(0); opacity:1; } 80% { opacity:1; } 100% { transform:translateY(-26px); opacity:0; } }
+  #sendrow { display:flex; gap:8px; align-items:center; min-width:100%; justify-content:center; }
+  #amount { font:600 14px var(--sans); width:110px; padding:6px 12px; border-radius:99px; border:2px solid var(--ink); background:transparent; color:var(--ink); }
   .label { font:700 10px var(--sans); letter-spacing:.22em; text-anchor:middle; fill:var(--ink); text-transform:uppercase; }
 
   .eye { transform-box:fill-box; transform-origin:50% 50%; transition:transform .08s; }
@@ -87,6 +94,11 @@
     <button id="stop">Stop all</button>
     <button id="feed">Feed 🍎</button>
     <button id="evolve">Evolve ⚡</button>
+    <div id="sendrow">
+      <select id="from"></select> <span>→</span> <select id="to"></select>
+      <input id="amount" type="number" min="1" value="500" aria-label="amount in rupees">
+      <button id="send">Send ₹</button>
+    </div>
   </div>
 <script src="characters.js"></script>
 <script src="growth.js"></script>
@@ -336,7 +348,7 @@ function petSVG(p, i){
   const ink = c.ink.map((e, k) => A.eyeIdx.includes(k) ? `<g class="eye">${e}${G ? G.glint(e) : ''}</g>` : E && A.mouthIdx.includes(k) ? '' : e).join('');   // an emotion draws its own mouth     // eyes wrapped so blinking doesn't fight their translate
   const items = `${attachment('neck', p.neck, A)}${attachment('eyes', E?.eyes || p.eyes, A)}${attachment('hat', p.hat, A)}`;   // a mood can put on its own eyewear
   const skin = G ? G.skin : c.skin.join('');
-  return `<g class="pet ${p.likesPets?'likes':'hates'} ${evo[i]?'evolving':''}" data-i="${i}" transform="translate(${pos[i]} ${GROUND})">
+  return `<g class="pet ${p.likesPets?'likes':'hates'} ${evo[i]?'evolving':''} ${xfer && !xfer.who.includes(i) ? 'dim' : ''}" data-i="${i}" transform="translate(${pos[i]} ${GROUND})">
     ${G ? `<defs>${G.defs}</defs>` : ''}
     <g class="grow" transform="scale(${t.scale.toFixed(3)})"><g class="pw">
       ${G ? G.shadow : `<ellipse class="shadow" cx="0" cy="1" rx="${(A.W*.42).toFixed(1)}" ry="4" fill="#000" opacity=".08"/>`}
@@ -363,7 +375,8 @@ function xpUI(){
 }
 function render(){
   Object.values(hearts).forEach(clearInterval);
-  svg.innerHTML = pets.map(petSVG).join('');
+  const order = pets.map((_, i) => i).sort((a, b) => (xfer?.who.includes(a) ? 1 : 0) - (xfer?.who.includes(b) ? 1 : 0));   // send-money pair drawn on top
+  svg.innerHTML = order.map(i => petSVG(pets[i], i)).join('');
   bindRefs(); hover.forEach(startHearts);
   pets.forEach((_,i) => LAST[i] && applyPose(i, LAST[i]));
   xpUI();
@@ -371,6 +384,9 @@ function render(){
     (none ? `<option value="">${none}</option>` : '') + vals.map(([v, txt]) => `<option value="${v}" ${String(v)===String(cur)?'selected':''}>${label(txt)}</option>`).join('');
   document.getElementById('name').textContent = SPECIES[p.species].forms[p.form].name + (p.likesPets ? ' · loves pets' : ' · hates pets');
   opts('species', SPECIES.map((s,k) => [k, s.name]), p.species);
+  { const who = pets.map((q,k) => [k, `${k + 1}. ${SPECIES[q.species].forms[q.form].name}`]), f = document.getElementById('from'), t = document.getElementById('to');
+    const fv = f.value || '0', tv = t.value || '1';
+    opts('from', who, fv, '', v => 'from ' + v); opts('to', who, tv, '', v => 'to ' + v); }
   opts('evostage', SPECIES[p.species].forms.map((f,k) => [k, `${k + 1}. ${f.name} (Lv ${f.at})`]), p.form, '', v => 'stage ' + v);
   for (const slot of ['hat','eyes','neck','prop']) opts(slot, Object.keys(ITEMS[slot]).map(v => [v, v.replace(/([a-z])([A-Z])/g,'$1 $2')]), p[slot], `no ${slot}`);
   opts('gait', GAIT_NAMES.map(v => [v, v]), p.gait, '', v => 'walk: ' + v);
@@ -403,6 +419,8 @@ function pose(i, dt, t){
     if (em.slump) { sy *= 1 - em.slump*q; sx *= 1 + em.slump*.6*q; }
   }
   if (a.hop > 0) { const pp = 1 - a.hop/.6, air = S(Math.PI*pp); by -= 26*air; sy *= 1 + .08*air; sx *= 1 - .05*air; a.hop -= dt; }
+  if (a.catch > 0) { const c = a.catch/.22; sy *= 1 - .12*c; sx *= 1 + .09*c; a.catch -= dt; }      // squash as money lands
+  lean += TX[i] || 0;                                                                                 // wind-up lean towards the receiver
   return { by, lean, sx, sy, flip: m === 'walk' || m === 'home' ? dr : 1 };
 }
 function applyPose(i, P){
@@ -446,7 +464,7 @@ svg.addEventListener('mouseout',  e => { const el = e.target.closest('.pet'); if
 svg.addEventListener('click', e => { const el = e.target.closest('.pet'); if (el) { sel = +el.dataset.i; render(); } });
 
 // ---------- growth + evolution ----------
-function float(i, text, cls, y=60){ const t = document.createElementNS(NS,'text'); t.textContent = text; t.setAttribute('class',cls); t.setAttribute('x', pos[i]); t.setAttribute('y', y); svg.append(t); setTimeout(() => t.remove(), 1500); }
+function float(i, text, cls, y=60, ms=1500){ const t = document.createElementNS(NS,'text'); t.textContent = text; t.setAttribute('class',cls); t.setAttribute('x', pos[i]); t.setAttribute('y', y); svg.append(t); setTimeout(() => t.remove(), ms); }
 function addXp(i, event, amount=1){
   const forms = SPECIES[pets[i].species].forms, before = Growth.traits(pets[i].xp, forms, pets[i].form), r = Growth.gain(pets[i].xp, event, amount);
   pets[i].xp = r.xp; const after = Growth.traits(r.xp, forms, pets[i].form);
@@ -475,6 +493,73 @@ document.getElementById('feed').onclick = () => { float(sel,'🍎','heart'); add
 document.getElementById('evolve').onclick = () => { const nx = SPECIES[pets[sel].species].forms[pets[sel].form+1]; if (!nx || evo[sel]) return;
   pets[sel].xp = Math.max(pets[sel].xp, Math.ceil(Growth.xpForLevel(nx.at))); render(); checkEvolution(sel); };
 
+// ---------- send money: sender and receiver meet centre stage, notes and coins arc across, receiver celebrates ----------
+let xfer = null; const TGT = [], TX = [];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const until = (ok, ms = 60) => new Promise(r => { const t = setInterval(() => { if (ok()) { clearInterval(t); r(); } }, ms); });
+// a banknote with a front and a back, so it can flip end over end like the papers in the Windows XP copy dialog
+const NOTE_FRONT = `<rect x="-16" y="-9" width="32" height="18" rx="2.5" fill="#8fd18a" stroke="#4e9a49" stroke-width="1.5"/><rect x="-12.5" y="-5.5" width="25" height="11" rx="1.5" fill="none" stroke="#4e9a49" stroke-width="1" opacity=".6"/><circle r="4.2" fill="#c8ecc4" stroke="#4e9a49" stroke-width="1.2"/><text y="2.6" font-size="7" font-weight="800" text-anchor="middle" fill="#2f6b2b">₹</text>`;
+const NOTE_BACK  = `<rect x="-16" y="-9" width="32" height="18" rx="2.5" fill="#6fb469" stroke="#3f8a3a" stroke-width="1.5"/><path d="M-11 -3 H11 M-11 1 H11 M-11 5 H4" stroke="#3f8a3a" stroke-width="1" opacity=".55"/>`;
+function bodyAt(i){       // world-space size of a pet right now
+  const p = pets[i], A = analyze(SPECIES[p.species].forms[p.form].id), sc = Growth.traits(p.xp, SPECIES[p.species].forms, p.form).scale;
+  return { W:A.W*sc, H:A.H*sc };
+}
+// every note follows the same arc at the same pace (a steady stream, like XP's flying papers),
+// flipping end over end on the way: scaleY = cos(turn) shows the back while it's negative
+function fly(k, a, b, onLand){
+  const el = document.createElementNS(NS,'g');
+  el.innerHTML = `<g class="front">${NOTE_FRONT}</g><g class="back" style="display:none">${NOTE_BACK}</g>`; svg.append(el);
+  const front = el.querySelector('.front'), back = el.querySelector('.back');
+  const t0 = performance.now(), dur = 1150, h = 95, turns = 1.5, dir = Math.sign(b[0] - a[0]) || 1;
+  (function step(now){
+    const u = Math.min(1, (now - t0)/dur), x = a[0] + (b[0] - a[0])*u, y = a[1] + (b[1] - a[1])*u - h*4*u*(1 - u);
+    const flip = C(TAU*turns*u), showBack = flip < 0;
+    front.style.display = showBack ? 'none' : ''; back.style.display = showBack ? '' : 'none';
+    const tilt = dir*(-25 + 50*u), skew = 12*S(TAU*turns*u), lift = 1 + .18*S(Math.PI*u);    // nose up, then down; a little closer mid-flight
+    el.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${tilt.toFixed(1)}) skewX(${skew.toFixed(1)}) scale(${lift.toFixed(3)} ${(lift*Math.max(.08, Math.abs(flip))).toFixed(3)})`);
+    if (u < 1) requestAnimationFrame(step); else { el.remove(); onLand(); }
+  })(t0);
+}
+function burst(x, y, glyphs, n = 12){
+  for (let k = 0; k < n; k++) { const ang = k/n*TAU, t = document.createElementNS(NS,'text'); t.textContent = glyphs[k % glyphs.length]; t.setAttribute('class','spark');
+    t.setAttribute('x', x); t.setAttribute('y', y); t.style.setProperty('--dx', C(ang)*70 + 'px'); t.style.setProperty('--dy', S(ang)*70 + 'px'); svg.append(t); setTimeout(() => t.remove(), 1200); }
+}
+async function sendMoney(from, to, amount){
+  if (xfer || from === to || evo[from] || evo[to]) return;
+  const saved = [pets[from].emotion, pets[to].emotion];
+  xfer = { who:[from, to] }; [from, to].forEach(i => { if (mode[i] !== 'idle' && mode[i] !== 'home') mode[i] = 'home'; });
+  // 1. meet centre stage, sender on the side it already stands
+  const left = pos[from] <= pos[to];
+  TGT[from] = left ? 230 : 470; TGT[to] = left ? 470 : 230; mode[from] = mode[to] = 'home'; render();
+  await until(() => mode[from] === 'idle' && mode[to] === 'idle');
+  const side = Math.sign(pos[to] - pos[from]);
+  // 2. wind-up: sender leans back, shows the amount, then throws
+  float(from, `-₹${amount.toLocaleString('en-IN')}`, 'spent', GROUND - bodyAt(from).H - 40, 1900);
+  TX[from] = -side*9; await sleep(380); TX[from] = side*7; hop(from); await sleep(160); TX[from] = 0;
+  // 3. money arcs across; every landing squashes the receiver a little
+  const n = clamp(Math.round(Math.log10(amount + 1)*3), 5, 16), fb = bodyAt(from), tb = bodyAt(to);
+  let landed = 0;
+  for (let k = 0; k < n; k++) {
+    fly(k, [pos[from] + side*fb.W*.42, GROUND - fb.H*.55], [pos[to] - side*tb.W*.1, GROUND - tb.H*.5], () => {
+      landed++; A_[to].catch = .22;
+      if (landed === n) burst(pos[to], GROUND - tb.H*.5, ['✦','₹','✦']);
+    });
+    await sleep(190);   // evenly spaced stream
+  }
+  await until(() => landed === n);
+  // 4. celebrate: receiver happy and hopping, both smiling
+  pets[to].emotion = 'happy'; pets[from].emotion = 'happy'; render(); hop(to);
+  float(to, `+₹${amount.toLocaleString('en-IN')}`, 'paid', GROUND - tb.H - 46, 2300);
+  await sleep(2300);
+  // 5. back to normal
+  pets[from].emotion = saved[0]; pets[to].emotion = saved[1]; delete TGT[from]; delete TGT[to];
+  mode[from] = mode[to] = 'home'; xfer = null; render();
+}
+document.getElementById('send').onclick = () => {
+  const from = +document.getElementById('from').value, to = +document.getElementById('to').value, amt = Math.max(1, Math.round(+document.getElementById('amount').value || 0));
+  sendMoney(from, to, amt);
+};
+
 // ---------- main loop ----------
 const setMode = (i, m) => { if (evo[i]) return; mode[i] = (mode[i]===m ? (m==='walk' ? 'home' : 'idle') : m); };
 let last = performance.now();
@@ -488,7 +573,8 @@ let last = performance.now();
       addXp(i,'walk',dt);
       const sp = (GAITS[pets[i].gait] || GAITS.waddle).speed * Growth.traits(pets[i].xp, SPECIES[pets[i].species].forms, pets[i].form).scale;
       if (m==='walk') { pos[i] += dir[i]*sp*dt; if (pos[i]>670) { pos[i]=670; dir[i]=-1; } if (pos[i]<30) { pos[i]=30; dir[i]=1; } }
-      else { const d = XS[i]-pos[i]; dir[i] = Math.sign(d)||1; if (Math.abs(d) < sp*dt) { pos[i]=XS[i]; mode[i]='idle'; } else pos[i] += dir[i]*sp*dt; }
+      // home: walk back to the slot, or (sp2: twice as fast) to a send-money meet-up point
+      else { const T = TGT[i] ?? XS[i], d = T-pos[i], sp2 = TGT[i] != null ? sp*2 : sp; dir[i] = Math.sign(d)||1; if (Math.abs(d) < sp2*dt) { pos[i]=T; mode[i]='idle'; } else pos[i] += dir[i]*sp2*dt; }
     }
     refs[i].el.setAttribute('transform', `translate(${pos[i]} ${GROUND})`);
     applyPose(i, pose(i, dt, t));
