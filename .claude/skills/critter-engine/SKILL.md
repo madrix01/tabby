@@ -1,16 +1,16 @@
 ---
 name: critter-engine
-description: Add and use the critter_engine Flutter package (github.com/madrix01/tabby) to render evolving pet critters with hats, eyewear, neck items and props from a JSON spec. Use when installing critter_engine, rendering a CritterView, building or validating critter JSON payloads (species, form, attachments, inline items), defining custom items as JSON, using the glow look (glow, halo, shadow, shading), setting a mood (happy, sad, food, entertainment, travel, shopping, empty_wallet), playing the send-money animation between two critters (MoneyTransferView), or adding new characters or items to the catalog.
+description: Add and use the critter_engine Flutter package (github.com/madrix01/tabby) to render evolving pet critters (two art sets, v3 and v4, usable side by side) with hats, eyewear, neck items and props from a JSON spec. Use when installing critter_engine, rendering a CritterView, building or validating critter JSON payloads (species, form, attachments, inline items), defining custom items as JSON, using the glow look (glow, halo, shadow, shading), setting a mood (happy, sad, food, entertainment, travel, shopping, empty_wallet), playing the send-money animation between two critters (MoneyTransferView), or adding new characters or items to the catalog.
 ---
 
 # critter_engine
 
-A Flutter package that draws a "critter" from a JSON spec. A critter is one of 46 flat-colour characters, at some stage of its evolution line, optionally wearing a hat, eyewear and a neck item, and holding a prop. All character geometry is precomputed in a bundled catalog, so the app only composes SVG and never measures anything.
+A Flutter package that draws a "critter" from a JSON spec. A critter is one of 86 characters in two art sets (46 flat-colour **v3** characters and 40 textured **v4** shapes with eye whites and legs), at some stage of its evolution line, optionally wearing a hat, eyewear and a neck item, and holding a prop. All character geometry is precomputed in a bundled catalog, so the app only composes SVG and never measures anything.
 
 Repo layout (github.com/madrix01/tabby):
 - `critter_engine/`: the Flutter package. This is what apps depend on.
-- `compiler/`: Node tool that builds `critter_engine/assets/critter_catalog.json` from `characters/*.svg`. Only needed when adding characters or bundled items.
-- `v3/index.html`: browser prototype; open it to see the same critters animated.
+- `compiler/`: Node tool that builds `critter_engine/assets/critter_catalog.json` from `characters/*.svg` (v3 set) and `shapes_v4/*.svg` (v4 set). Only needed when adding characters or bundled items.
+- `v3/index.html`, `v4/index.html`: browser prototypes; open them to see the same critters animated.
 
 ## 1. Install
 
@@ -40,7 +40,7 @@ import 'package:flutter/material.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final catalog = await CritterCatalog.load();   // ~300 KB JSON from the package's assets
+  final catalog = await CritterCatalog.load();   // ~1.4 MB JSON (both sets) from the package's assets; load once at startup
   runApp(MyApp(catalog: catalog));
 }
 ```
@@ -112,6 +112,29 @@ Missing fields get defaults, and unknown ids are ignored. Values of the wrong ty
 | lemon | Lemon → Bunny → Sunny | 1, 4, 8 |
 | mochi | Mochi → Mochiko → Mochimaru | 1, 4, 8 |
 | nimbo | Nimbo → Cumulo → Seraphluff | 1, 4, 8 |
+
+### v4 species (textured shapes with eye whites and legs)
+| id | forms (form 0 → last) | levels |
+|---|---|---|
+| dewdrop | Dewdrop → Blocky → Sunburst | 1, 4, 8 |
+| pea | Pea → Domelet → Fernspike | 1, 4, 8 |
+| sandy | Sandy → Trigreen → Mossgon | 1, 4, 8 |
+| tock | Tock → Puffpink → Hexie → Stripeling | 1, 3, 6, 10 |
+| stilts | Stilts → Crownie → Starla | 1, 4, 8 |
+| wiggle | Wiggle → Tango → Fizz | 1, 4, 8 |
+| hexo | Hexo → Blocko → Stellar | 1, 4, 8 |
+| pebblet | Pebblet → Domer → Boxley | 1, 4, 8 |
+| drippy | Drippy → Chunk → Crate | 1, 4, 8 |
+| mound | Mound → Glass → Cookie | 1, 4, 8 |
+| bean | Bean → Stripey → Plank | 1, 4, 8 |
+| puffin | Puffin → Boxy → Rowan | 1, 4, 8 |
+| speckle | Speckle → Dotty → Crag | 1, 4, 8 |
+
+### Using both sets
+- **No switch needed:** both sets live in the one catalog and a spec only names a `species`, so a v3 and a v4 critter can sit side by side or send money to each other (`MoneyTransferView(from: blip…, to: dewdrop…)`).
+- **Same frame:** both sets share the frame and character space (~100 units tall, feet at the origin), so sizes stay comparable.
+- **Listing one set:** `catalog.speciesIn('v4')` (or `'v3'`) lists one set's lines, e.g. for a picker; `species.collection` tells you which set a line is from.
+- **What's different about v4:** v4 characters have a texture clipped to the body, white eyes with pupils (they blink together), body-coloured legs, and no drawn mouth; moods add one under the eyes. Some v4 shapes (Blocky, Hexo, Domer…) have closed eyes in the texture: they don't blink, but eyewear and moods still sit on them.
 
 To derive `form` from xp on the client instead, use the exported curve. A form is unlocked once `levelOf(xp) >= form.atLevel`:
 ```dart
@@ -278,6 +301,7 @@ Notes:
 - **One item per slot.** A critter can't hold a money bag and a gold bar at once.
 - **Art comes from the catalog.** New characters need the compiler (section 10); they can't be sent as JSON.
 - **Two-headed character 23** (Twinny in the `ember` line): it gets its hat between the heads and its glasses spanning both.
+- **v4 hats on spiky tops** (Fernspike, Crownie, Crag) sit on the widest part under the spikes, like in `v4/index.html`.
 
 ## 10. Adding characters or bundled items (repo maintainers)
 
@@ -286,9 +310,11 @@ cd compiler && npm install && npm run build   # rebuilds critter_engine/assets/c
 cd ../critter_engine && flutter test           # parity, svg validity, goldens
 ```
 
-- **New character:** drop `character_NN.svg` (flat paths/circles, eyes and mouth in `#2b2a33`) into `characters/`, then add it to an evolution line in `compiler/items.mjs` under `LINES`. The build warns about any character that isn't in a line.
+- **New v3 character:** drop `character_NN.svg` (flat paths/circles, eyes and mouth in `#2b2a33`) into `characters/`, then add it to an evolution line in `compiler/items.mjs` under `LINES`. The build warns about any character that isn't in a line.
+- **New v4 character:** drop `shape_NN.svg` (same structure as the others: body path, clipped texture group, `#ffffff` eye whites, `#1c1a1f` pupils and legs) into `shapes_v4/` and add it as `v4_NN` to a line under `LINES_V4`. `compiler/v4.mjs` parses and measures it the way `v4/index.html` does.
+- **Evolution sheets:** the build also writes `docs/evolution_sheet.svg` (v3) and `docs/evolution_sheet_v4.svg`.
 - **New bundled item:** add it to `HATS`, `NECK`, `PROPS` or `EYEWEAR` in `compiler/items.mjs`, using the same shapes as the JSON items above.
-- **Checking the result:** open `compiler/out/gallery.html` to see every character wearing items.
+- **Checking the result:** open `compiler/out/gallery.html` to see every character (both sets) wearing items.
 - **Golden images:** if a change is intentional, refresh them with `flutter test --update-goldens test/golden_test.dart`. Goldens are rendered on macOS; on Linux CI either regenerate them there or skip that test.
 
 ## Troubleshooting
@@ -302,4 +328,4 @@ cd ../critter_engine && flutter test           # parity, svg validity, goldens
 | An item doesn't show | Unknown id, wrong `slot`, or the inline item was rejected (check debug output or the result of `registerItems`). |
 | Glow looks washed out or invisible | It's on a light background; glow is designed for dark backgrounds. Lower `halo`, or use the flat look on light screens. |
 | Critter looks tiny | It's a form-0 (baby) form, or the widget is narrow. The frame is shared, so scale with the widget width. |
-| `FormatException: critter catalog vN is newer than this engine` | The catalog and package versions are out of step; update the package. |
+| `FormatException: critter catalog vN is newer than this engine` | The catalog and package versions are out of step; update the package. The v4 set needs catalog v2, i.e. an engine with `supportedVersion` 2. |

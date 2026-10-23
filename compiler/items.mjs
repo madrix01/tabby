@@ -77,5 +77,21 @@ export const LINES = [
   [['41','Mochi'],   ['43','Mochiko'],   ['44','Mochimaru']],
   [['42','Nimbo'],   ['45','Cumulo'],    ['46','Seraphluff']],
 ];
+// v4 lines: the shapes_v4 set (character ids are v4_<shape number>), same levels and sizes as above
+export const LINES_V4 = [
+  [['v4_02','Dewdrop'], ['v4_19','Blocky'],   ['v4_15','Sunburst']],
+  [['v4_23','Pea'],     ['v4_08','Domelet'],  ['v4_03','Fernspike']],
+  [['v4_28','Sandy'],   ['v4_33','Trigreen'], ['v4_12','Mossgon']],
+  [['v4_10','Tock'],    ['v4_16','Puffpink'], ['v4_38','Hexie'],   ['v4_05','Stripeling']],
+  [['v4_34','Stilts'],  ['v4_25','Crownie'],  ['v4_04','Starla']],
+  [['v4_21','Wiggle'],  ['v4_09','Tango'],    ['v4_26','Fizz']],
+  [['v4_14','Hexo'],    ['v4_35','Blocko'],   ['v4_32','Stellar']],
+  [['v4_07','Pebblet'], ['v4_29','Domer'],    ['v4_11','Boxley']],
+  [['v4_30','Drippy'],  ['v4_06','Chunk'],    ['v4_20','Crate']],
+  [['v4_17','Mound'],   ['v4_40','Glass'],    ['v4_01','Cookie']],
+  [['v4_18','Bean'],    ['v4_36','Stripey'],  ['v4_31','Plank']],
+  [['v4_24','Puffin'],  ['v4_37','Boxy'],     ['v4_13','Rowan']],
+  [['v4_22','Speckle'], ['v4_27','Dotty'],    ['v4_39','Crag']],
+];
 export const LEVELS = { 2:[1,6], 3:[1,4,8], 4:[1,3,6,10] };
 export const SIZES  = { 2:[.75,1.15], 3:[.7,1,1.3], 4:[.65,.9,1.15,1.35] };

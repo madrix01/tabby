@@ -12,7 +12,7 @@ class CritterCatalog {
   CritterCatalog._(this.version, this.inkColor, this.characters, this._items, this.species);
 
   static const assetKey = 'packages/critter_engine/assets/critter_catalog.json';
-  static const supportedVersion = 1;
+  static const supportedVersion = 2;   // 2 adds the v4 set: clips, stroked legs, coloured eye parts, species collections
 
   final int version;
   final String inkColor;
@@ -54,6 +54,10 @@ class CritterCatalog {
 
   CritterItem? item(String slot, String id) => _items[slot]?[id];
 
+  /// Species of one art set: 'v3' (the original traced characters) or 'v4' (textured shapes with eye whites).
+  /// Sets can be mixed freely; a spec only names a species.
+  Iterable<CritterSpecies> speciesIn(String collection) => species.values.where((s) => s.collection == collection);
+
   /// Item ids available for a slot ('hat' | 'eyes' | 'neck' | 'prop').
   Iterable<String> itemIds(String slot) => _items[slot]?.keys ?? const [];
 
@@ -74,10 +78,14 @@ class CritterCatalog {
 }
 
 class CritterCharacter {
-  CritterCharacter._(this.id, this.width, this.height, this.skin, this.ink, this.anchors, this.bakedPlacements);
+  CritterCharacter._(this.id, this.width, this.height, this.clips, this.skin, this.ink, this.anchors, this.bakedPlacements);
 
   final String id;
   final double width, height;
+
+  /// Clip shapes (path data) referenced by [SkinPart.clip] / [InkPart.clip]: v4 textures stay inside the body,
+  /// pupils inside their eye whites. Empty for v3 characters.
+  final List<String> clips;
   final List<SkinPart> skin;
   final List<InkPart> ink;
 
@@ -94,7 +102,11 @@ class CritterCharacter {
       id,
       (j['width'] as num).toDouble(),
       (j['height'] as num).toDouble(),
-      [for (final p in (j['skin'] as List).cast<Map<String, dynamic>>()) SkinPart(p['d'] as String, p['fill'] as String, p['fillRule'] as String?)],
+      [for (final d in j['clips'] as List? ?? const []) d as String],
+      [
+        for (final p in (j['skin'] as List).cast<Map<String, dynamic>>())
+          SkinPart(p['d'] as String, p['fill'] as String, p['fillRule'] as String?, clip: p['clip'] as int?, stroke: (p['stroke'] as num?)?.toDouble()),
+      ],
       [for (final p in (j['ink'] as List).cast<Map<String, dynamic>>()) InkPart.fromJson(p)],
       CritterAnchors.fromJson(j['anchors'] as Map<String, dynamic>),
       {
@@ -110,6 +122,7 @@ class CritterAnchors {
   const CritterAnchors({
     required this.top, required this.eye, required this.eyes, required this.mouthAt, required this.mouthWidth, required this.eyeSpan, required this.eyeAngle, required this.eyeR, required this.headWidth,
     required this.hatAt, required this.hatWidth, required this.neck, required this.neckWidth, required this.side,
+    this.bodyTop, this.bodyBottom,
   });
 
   /// Highest point of the head (antennae, top-knots, floating halos included).
@@ -135,6 +148,9 @@ class CritterAnchors {
   /// Ground point beside the feet for props.
   final Offset side;
 
+  /// Top and bottom of the body itself, without legs (v4 characters; null for v3 where the body is the whole height).
+  final double? bodyTop, bodyBottom;
+
   factory CritterAnchors.fromJson(Map<String, dynamic> j) {
     Offset o(dynamic v) => Offset(((v as List)[0] as num).toDouble(), (v[1] as num).toDouble());
     double d(String k) => (j[k] as num).toDouble();
@@ -144,22 +160,33 @@ class CritterAnchors {
       mouthAt: o((j['mouth'] as Map<String, dynamic>)['at']), mouthWidth: ((j['mouth'] as Map<String, dynamic>)['width'] as num).toDouble(),
       eyeSpan: d('eyeSpan'), eyeAngle: d('eyeAngle'), eyeR: d('eyeR'), headWidth: d('headWidth'),
       hatAt: o(hat['at']), hatWidth: (hat['width'] as num).toDouble(), neck: o(j['neck']), neckWidth: d('neckWidth'), side: o(j['side']),
+      bodyTop: ((j['body'] as List?)?[0] as num?)?.toDouble(), bodyBottom: ((j['body'] as List?)?[1] as num?)?.toDouble(),
     );
   }
 }
 
 class SkinPart {
-  const SkinPart(this.d, this.fill, this.fillRule);
+  const SkinPart(this.d, this.fill, this.fillRule, {this.clip, this.stroke});
   final String d, fill;
   final String? fillRule;
+
+  /// Index into [CritterCharacter.clips], or null.
+  final int? clip;
+
+  /// Outline width in the part's own colour (v4 legs are drawn a touch thicker), or null.
+  final double? stroke;
 }
 
-/// A face mark in the ink colour: a path or a circle. [eye] marks the ones that blink, [mouth] the ones a mood replaces.
+/// A face mark: a path or a circle, in the ink colour unless [fill] says otherwise (v4 eye whites).
+/// [eye] marks the ones that blink, [mouth] the ones a mood replaces.
 class InkPart {
-  const InkPart({this.d, this.cx = 0, this.cy = 0, this.r = 0, this.fillRule, required this.eye, this.mouth = false});
+  const InkPart({this.d, this.cx = 0, this.cy = 0, this.r = 0, this.fillRule, this.fill, this.clip, required this.eye, this.mouth = false});
   final String? d;
   final double cx, cy, r;
-  final String? fillRule;
+  final String? fillRule, fill;
+
+  /// Index into [CritterCharacter.clips], or null (a v4 pupil stays inside its eye white).
+  final int? clip;
   final bool eye, mouth;
 
   factory InkPart.fromJson(Map<String, dynamic> j) => InkPart(
@@ -168,6 +195,8 @@ class InkPart {
         cy: (j['cy'] as num?)?.toDouble() ?? 0,
         r: (j['r'] as num?)?.toDouble() ?? 0,
         fillRule: j['fillRule'] as String?,
+        fill: j['fill'] as String?,
+        clip: j['clip'] as int?,
         eye: j['eye'] as bool,
         mouth: j['mouth'] as bool? ?? false,
       );
@@ -175,11 +204,14 @@ class InkPart {
 
 /// An evolution line: one character per form, unlocked at [CritterForm.atLevel].
 class CritterSpecies {
-  CritterSpecies(this.id, this.forms);
+  CritterSpecies(this.id, this.forms, {this.collection = 'v3'});
   final String id;
   final List<CritterForm> forms;
 
-  factory CritterSpecies.fromJson(Map<String, dynamic> j) => CritterSpecies(j['id'] as String, [
+  /// The art set this line comes from: 'v3' or 'v4'.
+  final String collection;
+
+  factory CritterSpecies.fromJson(Map<String, dynamic> j) => CritterSpecies(j['id'] as String, collection: j['collection'] as String? ?? 'v3', [
         for (final f in (j['forms'] as List).cast<Map<String, dynamic>>())
           CritterForm(f['character'] as String, f['name'] as String, f['atLevel'] as int,
               ((f['size'] as List)[0] as num).toDouble(), ((f['size'] as List)[1] as num).toDouble()),

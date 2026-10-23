@@ -10,7 +10,7 @@ void main() {
   final catalog = CritterCatalog.fromJsonString(File('assets/critter_catalog.json').readAsStringSync());
   // every character once, as the form of its species line it belongs to
   final specs = [
-    for (final s in catalog.species.values)
+    for (final s in catalog.speciesIn('v3'))
       for (var f = 0; f < s.forms.length; f++) (id: s.forms[f].character, species: s.id, form: f),
   ]..sort((a, b) => a.id.compareTo(b.id));
   List<String> ids(String slot) => catalog.itemIds(slot).toList();
@@ -45,6 +45,37 @@ void main() {
     ]));
     await settle(tester);
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/gallery.png'));
+  });
+
+  testWidgets('gallery: the v4 set, flat and glow', (tester) async {
+    tester.view.physicalSize = const Size(1600, 790);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final v4 = [
+      for (final s in catalog.speciesIn('v4'))
+        for (var f = 0; f < s.forms.length; f++) (species: s.id, form: f),
+    ];
+    final hats = ids('hat'), eyes = ids('eyes');
+    await tester.pumpWidget(board([
+      for (final (n, s) in v4.indexed)
+        CritterView(catalog: catalog, look: n.isOdd ? CritterLook.glow : CritterLook.flat,
+            spec: CritterSpec(species: s.species, form: s.form, attachments: CritterAttachments(hat: n % 3 == 0 ? hats[n % hats.length] : null, eyes: n % 4 == 1 ? eyes[n % eyes.length] : null))),
+    ]));
+    await settle(tester);
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/gallery_v4.png'));
+  });
+
+  testWidgets('v4 moods', (tester) async {
+    tester.view.physicalSize = const Size(1750, 330);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(board(columns: 7, [
+      for (final (sp, f, mood) in [('dewdrop', 2, 'happy'), ('tock', 2, 'sad'), ('pea', 1, 'food'),
+                                   ('wiggle', 2, 'entertainment'), ('mound', 2, 'travel'), ('stilts', 1, 'shopping'), ('pebblet', 2, 'empty_wallet')])
+        CritterView(catalog: catalog, spec: CritterSpec.fromJson({'species': sp, 'form': f, 'mood': mood})),
+    ]));
+    await settle(tester);
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/moods_v4.png'));
   });
 
   testWidgets('evolution line grows and items re-fit', (tester) async {

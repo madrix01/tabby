@@ -1,6 +1,6 @@
 ---
 name: critter-backend
-description: Backend contract for the critter pets rendered by the critter_engine Flutter app (github.com/madrix01/tabby). Use when building, validating or reviewing any JSON a backend sends to the frontend about critters/blobs/pets — the critter spec (species, form/evolution stage, xp, attachments, mood incl. empty_wallet, look/glow), custom item definitions (hats, eyewear, neck items, props as SVG), the item store list, or the money transfer (send money) payload — and when you need the valid slugs for species, forms, items, moods or looks, or the xp-to-level/evolution math.
+description: Backend contract for the critter pets rendered by the critter_engine Flutter app (github.com/madrix01/tabby). Use when building, validating or reviewing any JSON a backend sends to the frontend about critters/blobs/pets — the critter spec (species, form/evolution stage, xp, attachments, mood incl. empty_wallet, look/glow), custom item definitions (hats, eyewear, neck items, props as SVG), the item store list, or the money transfer (send money) payload — and when you need the valid slugs for species (v3 and v4 sets), forms, items, moods or looks, or the xp-to-level/evolution math.
 ---
 
 # Critter backend contract
@@ -61,7 +61,7 @@ Smallest valid payload: `{ "species": "blip" }`.
 
 ## 3. Custom item definition (B) and item list (C)
 
-The app places any item on any of its 46 characters automatically, from that character's measured eyes, head and neck. Never send per-character positions.
+The app places any item on any of its 86 characters (both sets) automatically, from that character's measured eyes, head and neck. Never send per-character positions.
 
 ```json
 { "id": "viking", "slot": "hat",  "anchor": [50, 60], "svg": "<path d='M10 60 Q10 20 50 20 Q90 20 90 60Z' fill='#9aa0a6'/>" }
@@ -90,8 +90,9 @@ The app places any item on any of its 46 characters automatically, from that cha
 
 ## 4. Species slugs and evolution stages
 
-Each species is an evolution line. `form` is the index into its stages.
+Each species is an evolution line. `form` is the index into its stages. There are two art sets, **v3** (16 lines below) and **v4** (13 lines in the second table). They are just more species slugs: mix them freely in any payload, including a money transfer from a v3 critter to a v4 one. The set never has to be sent.
 
+#### v3 set
 | `species` | form 0 | form 1 | form 2 | form 3 | max `form` |
 |---|---|---|---|---|---|
 | `blip` | Blip | Cloudbert (Lv 4) | Blobfred (Lv 8) | | 2 |
@@ -111,9 +112,30 @@ Each species is an evolution line. `form` is the index into its stages.
 | `mochi` | Mochi | Mochiko (Lv 4) | Mochimaru (Lv 8) | | 2 |
 | `nimbo` | Nimbo | Cumulo (Lv 4) | Seraphluff (Lv 8) | | 2 |
 
+#### v4 set (textured shapes with eye whites and legs)
+| `species` | form 0 | form 1 | form 2 | form 3 | max `form` |
+|---|---|---|---|---|---|
+| `dewdrop` | Dewdrop | Blocky (Lv 4) | Sunburst (Lv 8) | | 2 |
+| `pea` | Pea | Domelet (Lv 4) | Fernspike (Lv 8) | | 2 |
+| `sandy` | Sandy | Trigreen (Lv 4) | Mossgon (Lv 8) | | 2 |
+| `tock` | Tock | Puffpink (Lv 3) | Hexie (Lv 6) | Stripeling (Lv 10) | 3 |
+| `stilts` | Stilts | Crownie (Lv 4) | Starla (Lv 8) | | 2 |
+| `wiggle` | Wiggle | Tango (Lv 4) | Fizz (Lv 8) | | 2 |
+| `hexo` | Hexo | Blocko (Lv 4) | Stellar (Lv 8) | | 2 |
+| `pebblet` | Pebblet | Domer (Lv 4) | Boxley (Lv 8) | | 2 |
+| `drippy` | Drippy | Chunk (Lv 4) | Crate (Lv 8) | | 2 |
+| `mound` | Mound | Glass (Lv 4) | Cookie (Lv 8) | | 2 |
+| `bean` | Bean | Stripey (Lv 4) | Plank (Lv 8) | | 2 |
+| `puffin` | Puffin | Boxy (Lv 4) | Rowan (Lv 8) | | 2 |
+| `speckle` | Speckle | Dotty (Lv 4) | Crag (Lv 8) | | 2 |
+
+`bean` is the v4 species; "Bean" is also the display name of form 1 of the v3 `pip` line. Display names are never sent, so they don't clash.
+
 Form 0 is always unlocked at level 1. The display names (Blip, Cloudbert…) are what the app shows. Don't send them; the app derives them from `species` and `form`.
 
-Source art files, for designers: `blip` 13 → 25 → 01 · `totem` 34 → 11 → 29 · `sprig` 02 → 17 → 16 · `radish` 32 → 36 · `pip` 28 → 03 → 15 · `ember` 37 → 23 → 08 · `pinky` 18 → 04 → 39 · `bunbun` 05 → 35 → 21 · `stamp` 30 → 20 · `squidge` 24 → 06 → 10 → 27 · `snowy` 19 → 07 · `cactoo` 09 → 14 → 38 · `drip` 33 → 31 → 26 · `lemon` 40 → 12 → 22 · `mochi` 41 → 43 → 44 · `nimbo` 42 → 45 → 46 (`characters/character_NN.svg`; 41–46 are drawn by `characters/make_extra.py`). `docs/evolution_sheet.svg` shows every line.
+Source art files, for designers: `blip` 13 → 25 → 01 · `totem` 34 → 11 → 29 · `sprig` 02 → 17 → 16 · `radish` 32 → 36 · `pip` 28 → 03 → 15 · `ember` 37 → 23 → 08 · `pinky` 18 → 04 → 39 · `bunbun` 05 → 35 → 21 · `stamp` 30 → 20 · `squidge` 24 → 06 → 10 → 27 · `snowy` 19 → 07 · `cactoo` 09 → 14 → 38 · `drip` 33 → 31 → 26 · `lemon` 40 → 12 → 22 · `mochi` 41 → 43 → 44 · `nimbo` 42 → 45 → 46 (`characters/character_NN.svg`; 41–46 are drawn by `characters/make_extra.py`). `docs/evolution_sheet.svg` shows every v3 line.
+
+v4 source art (`shapes_v4/shape_NN.svg`): `dewdrop` 02 → 19 → 15 · `pea` 23 → 08 → 03 · `sandy` 28 → 33 → 12 · `tock` 10 → 16 → 38 → 05 · `stilts` 34 → 25 → 04 · `wiggle` 21 → 09 → 26 · `hexo` 14 → 35 → 32 · `pebblet` 07 → 29 → 11 · `drippy` 30 → 06 → 20 · `mound` 17 → 40 → 01 · `bean` 18 → 36 → 31 · `puffin` 24 → 37 → 13 · `speckle` 22 → 27 → 39. `docs/evolution_sheet_v4.svg` shows every v4 line.
 
 ## 5. Item slugs (bundled)
 
@@ -155,7 +177,7 @@ Evolution thresholds: Lv 4 is **156** xp, Lv 8 is **556**, Lv 6 is **336**, Lv 3
 
 ```python
 import math
-UNLOCKS = {"squidge": [1, 3, 6, 10], "radish": [1, 6], "stamp": [1, 6], "snowy": [1, 6]}   # every other species: [1, 4, 8]
+UNLOCKS = {"squidge": [1, 3, 6, 10], "tock": [1, 3, 6, 10], "radish": [1, 6], "stamp": [1, 6], "snowy": [1, 6]}   # every other species (both sets): [1, 4, 8]
 def level(xp): return 1 + math.floor((max(0, xp) / 30) ** (1 / 1.5) + 1e-9)
 def form_for(species, xp):
     lv = level(xp)

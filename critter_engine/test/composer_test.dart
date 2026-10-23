@@ -9,11 +9,57 @@ CritterCatalog loadCatalog() => CritterCatalog.fromJsonString(File('assets/critt
 void main() {
   final catalog = loadCatalog();
 
-  test('catalog has every character placed in a species line', () {
-    expect(catalog.characters, hasLength(46));
-    expect(catalog.species, hasLength(16));
+  test('catalog has every character placed in a species line, in two collections', () {
+    expect(catalog.characters, hasLength(86));
+    expect(catalog.speciesIn('v3'), hasLength(16));
+    expect(catalog.speciesIn('v4'), hasLength(13));
+    expect(catalog.species, hasLength(29));
     final used = catalog.species.values.expand((s) => s.forms.map((f) => f.character)).toSet();
     expect(used, catalog.characters.keys.toSet());
+    expect(catalog.speciesIn('v4').expand((s) => s.forms).every((f) => f.character.startsWith('v4_')), isTrue);
+    expect(catalog.speciesIn('v3').expand((s) => s.forms).any((f) => f.character.startsWith('v4_')), isFalse);
+  });
+
+  group('v4 set', () {
+    test('textures and pupils are clipped, legs are stroked in the body colour, whites blink with the pupils', () {
+      final comp = compose(catalog, const CritterSpec(species: 'tock', form: 3))!, c = comp.character;   // Stripeling: striped texture, two eyes
+      expect(c.id, 'v4_05');
+      expect(c.clips, isNotEmpty);
+      for (final (k, _) in c.clips.indexed) {
+        expect(comp.base.contains('url(#k$k)') || comp.eyes.contains('url(#k$k)'), isTrue, reason: 'clip $k used');
+      }
+      final body = c.skin.first;
+      expect(RegExp('fill="${body.fill}"[^>]* stroke="${body.fill}" stroke-width=').hasMatch(comp.base), isTrue, reason: 'legs');
+      expect(comp.eyes, contains('fill="#ffffff"'), reason: 'eye whites on the blinking layer');
+      expect(comp.eyes, contains('clip-path="url(#k'), reason: 'pupils stay inside their whites');
+      expect(comp.eyes, contains('<clipPath'), reason: 'the eye layer carries its own clip shapes');
+      expect(c.anchors.bodyTop, isNotNull);
+      expect(c.anchors.bodyBottom!, lessThan(0), reason: 'the body ends above the feet');
+    });
+
+    test('closed-eye shapes still get eye anchors, no eye layer marks', () {
+      final c = compose(catalog, const CritterSpec(species: 'hexo'))!.character;   // Hexo: eyes are arcs in the texture
+      expect(c.ink, isEmpty);
+      expect(c.anchors.eyes, hasLength(2));
+      expect(c.anchors.eyeSpan, greaterThan(10));
+    });
+
+    test('glow: textures stay clipped, legs pick up the shading, no glint on the whites', () {
+      final glow = compose(catalog, const CritterSpec(species: 'tock', form: 3, look: CritterLook.glow))!;
+      vg.parseWithoutOptimizers(glow.base, warningsAsErrors: true);
+      expect(glow.base, contains('stroke="url(#g'));
+      expect(RegExp(r'<g clip-path="url\(#k\d+\)"><path d="[^"]+" fill="url\(#g').hasMatch(glow.base), isTrue);
+      final whites = compose(catalog, const CritterSpec(species: 'pebblet', look: CritterLook.glow))!.eyes;   // Pebblet: circle whites
+      expect('fill="#ffffff"/>'.allMatches(whites).length, greaterThanOrEqualTo(2));
+      expect('r="'.allMatches(whites).length, lessThanOrEqualTo(6), reason: 'glints only on the two pupils');
+    });
+
+    test('v3 and v4 critters mix in one view tree', () {
+      final a = compose(catalog, const CritterSpec(species: 'blip', mood: CritterMood.happy))!, b = compose(catalog, const CritterSpec(species: 'dewdrop', mood: CritterMood.happy))!;
+      expect(a.character.clips, isEmpty);
+      expect(b.character.id, startsWith('v4_'));
+      expect(CritterComposition.viewBox, isNotNull, reason: 'same viewBox for both sets, so sizes stay comparable');
+    });
   });
 
   test('engine placement matches the compiler for every character x bundled item', () {

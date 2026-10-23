@@ -63,9 +63,9 @@ CritterComposition? compose(CritterCatalog catalog, CritterSpec spec, {CritterLo
   final ink = catalog.inkColor, a = spec.attachments, lit = (look ?? spec.look) == CritterLook.glow, tune = glow ?? spec.glow;
 
   String rule(String? r) => r == null ? '' : ' fill-rule="$r"';
-  String mark(InkPart p) => p.d != null
-      ? '<path d="${p.d}" fill="$ink"${rule(p.fillRule)}/>'
-      : '<circle cx="${p.cx}" cy="${p.cy}" r="${p.r}" fill="$ink"/>';
+  String mark(InkPart p) => _clipped(p.clip, p.d != null
+      ? '<path d="${p.d}" fill="${p.fill ?? ink}"${rule(p.fillRule)}/>'
+      : '<circle cx="${p.cx}" cy="${p.cy}" r="${p.r}" fill="${p.fill ?? ink}"/>');
   final mood = spec.mood == null ? null : moodStyles[spec.mood];
   String placed(String slot, String? id) {
     if (id == null) return '';
@@ -73,16 +73,16 @@ CritterComposition? compose(CritterCatalog catalog, CritterSpec spec, {CritterLo
     return it == null ? '' : placeItem(c.anchors, it);
   }
 
-  final base = StringBuffer();
+  final base = StringBuffer(_clipDefs(c));
   if (lit) {
     base.write(_glowBody(c, tune));
   } else {
-    base.writeAll(c.skin.map((p) => '<path d="${p.d}" fill="${p.fill}"${rule(p.fillRule)}/>'));
+    base.writeAll(c.skin.map((p) => _clipped(p.clip, '<path d="${p.d}" fill="${p.fill}"${rule(p.fillRule)}${_stroke(p, p.fill)}/>')));
   }
   base.writeAll(c.ink.where((p) => !p.eye && !(mood != null && p.mouth)).map(mark)); // a mood draws its own mouth
   if (mood != null) base.write(moodFace(mood, c.anchors));
   // glossy eyes: a small glint on round eyes
-  String eye(InkPart p) => mark(p) + (lit && tune.gloss > 0 && p.d == null ? '<circle cx="${n2(p.cx + p.r * .32)}" cy="${n2(p.cy - p.r * .32)}" r="${n2(p.r * .32)}" fill="#ffffff"/>' : '');
+  String eye(InkPart p) => mark(p) + (lit && tune.gloss > 0 && p.d == null && p.fill == null ? '<circle cx="${n2(p.cx + p.r * .32)}" cy="${n2(p.cy - p.r * .32)}" r="${n2(p.r * .32)}" fill="#ffffff"/>' : '');
   final overlay = placed('neck', a.neck) + placed('eyes', mood?.eyewear ?? a.eyes) + placed('hat', a.hat);
   final prop = placed('prop', a.prop) + (mood == null ? '' : moodExtras(mood, c, hatWorn: a.hat != null));
 
@@ -93,7 +93,7 @@ CritterComposition? compose(CritterCatalog catalog, CritterSpec spec, {CritterLo
 
   return CritterComposition(
     base: svg(base.toString()),
-    eyes: svg(c.ink.where((p) => p.eye).map(eye).join()),
+    eyes: svg(_clipDefs(c) + c.ink.where((p) => p.eye).map(eye).join()),
     overlay: svg(overlay),
     prop: prop.isEmpty ? null : svg(prop),
     character: c,
@@ -104,6 +104,13 @@ CritterComposition? compose(CritterCatalog catalog, CritterSpec spec, {CritterLo
     glow: tune,
   );
 }
+
+// v4 parts can be clipped (texture inside the body, pupil inside its white): every layer that draws them carries the clip shapes
+String _clipDefs(CritterCharacter c) => c.clips.isEmpty
+    ? ''
+    : '<defs>${[for (final (k, d) in c.clips.indexed) '<clipPath id="k$k"><path d="$d"/></clipPath>'].join()}</defs>';
+String _clipped(int? clip, String el) => clip == null ? el : '<g clip-path="url(#k$clip)">$el</g>';
+String _stroke(SkinPart p, String paint) => p.stroke == null ? '' : ' stroke="$paint" stroke-width="${p.stroke}" stroke-linejoin="round"';
 
 /// Lit body: each part shaded light top-left to dark bottom-right, a glossy highlight clipped to the body,
 /// and a soft contact shadow under the feet. Gradients only; the halo is a Flutter blur in CritterView.
@@ -117,14 +124,16 @@ String _glowBody(CritterCharacter c, CritterGlow g) {
   out
     ..write('<radialGradient id="sh"><stop offset="0" stop-color="#000000" stop-opacity="${n2((.55 * g.shadow).clamp(0, 1))}"/><stop offset="1" stop-color="#000000" stop-opacity="0"/></radialGradient>')
     ..write('<radialGradient id="hl"><stop offset="0" stop-color="#ffffff" stop-opacity="${n2((.6 * g.gloss).clamp(0, 1))}"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>')
-    ..write('<clipPath id="body">${c.skin.map((p) => '<path d="${p.d}"/>').join()}</clipPath></defs>');
+    ..write('<clipPath id="body">${c.skin.where((p) => p.clip == null).map((p) => '<path d="${p.d}"/>').join()}</clipPath></defs>');
   if (g.shadow > 0) out.write('<ellipse cx="0" cy="1" rx="${n2(w * .55)}" ry="${n2(5 + w * .03)}" fill="url(#sh)"/>');
   for (final (k, p) in c.skin.indexed) {
-    out.write('<path d="${p.d}" fill="url(#g$k)"${p.fillRule == null ? '' : ' fill-rule="${p.fillRule}"'}/>');
+    out.write(_clipped(p.clip, '<path d="${p.d}" fill="url(#g$k)"${p.fillRule == null ? '' : ' fill-rule="${p.fillRule}"'}${_stroke(p, 'url(#g$k)')}/>'));
   }
-  final hx = -w * .2, hy = -h * .72;
+  // highlight on the upper body: the measured body when legs are drawn separately (v4), else the whole character
+  final top = c.anchors.bodyTop ?? -h, bodyH = (c.anchors.bodyBottom ?? 0) - top;
+  final hx = -w * .2, hy = top + bodyH * .28;
   if (g.gloss > 0) {
-    out.write('<g clip-path="url(#body)"><ellipse cx="${n2(hx)}" cy="${n2(hy)}" rx="${n2(w * .15)}" ry="${n2(h * .12)}" '
+    out.write('<g clip-path="url(#body)"><ellipse cx="${n2(hx)}" cy="${n2(hy)}" rx="${n2(w * .15)}" ry="${n2(bodyH * .12)}" '
         'transform="rotate(-25 ${n2(hx)} ${n2(hy)})" fill="url(#hl)"/></g>');
   }
   return out.toString();
