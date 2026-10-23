@@ -55,6 +55,23 @@ void main() {
     expect(count, 40 * 17);
   });
 
+  test('glow look: every species x form composes, parses and only adds lighting', () {
+    for (final species in catalog.species.values) {
+      for (var form = 0; form < species.forms.length; form++) {
+        final spec = CritterSpec(species: species.id, form: form, attachments: const CritterAttachments(hat: 'crown', eyes: 'goggles'));
+        final glow = compose(catalog, spec, look: CritterLook.glow)!, flat = compose(catalog, spec)!;
+        expect(glow.look, CritterLook.glow);
+        for (final layer in [glow.base, glow.eyes, glow.overlay]) {
+          vg.parseWithoutOptimizers(layer, key: '${species.id}/$form/glow', warningsAsErrors: true);
+        }
+        expect(glow.base, contains('url(#g0)'));
+        expect(glow.overlay, flat.overlay, reason: 'items are unchanged');
+      }
+    }
+    expect(CritterSpec.fromJson({'species': 'blip', 'look': 'glow'}).look, CritterLook.glow);
+    expect(CritterSpec.fromJson({'species': 'blip', 'look': 'neon'}).look, CritterLook.flat, reason: 'unknown look falls back');
+  });
+
   test('items land in the right layer, neck under eyewear under hat', () {
     final comp = compose(catalog, const CritterSpec(species: 'pip', form: 2,
         attachments: CritterAttachments(hat: 'crown', eyes: 'round', neck: 'bow_tie', prop: 'gold_bar')))!;

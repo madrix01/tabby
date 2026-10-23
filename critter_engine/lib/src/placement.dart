@@ -7,14 +7,15 @@ import 'item.dart';
 // Where any item goes on any character, from the character's anchors. Mirrors attachments() / lenses()
 // in compiler/compile.mjs; the parity test keeps the two in step.
 
-String _n(double v) {
+/// Number formatting shared by everything that writes SVG: at most 2 decimals, no trailing ".0".
+String n2(double v) {
   final r = (v * 100).round() / 100;
   return r == r.truncateToDouble() ? '${r.toInt()}' : '$r';
 }
 
 /// Lands the item's [m] on [at], tilted by [angle] degrees and scaled by [k].
 String place(Offset at, Offset m, double k, [double angle = 0]) =>
-    'translate(${_n(at.dx)} ${_n(at.dy)}) rotate(${_n(angle)}) scale(${(k * 10000).round() / 10000}) translate(${_n(-m.dx)} ${_n(-m.dy)})';
+    'translate(${n2(at.dx)} ${n2(at.dy)}) rotate(${n2(angle)}) scale(${(k * 10000).round() / 10000}) translate(${n2(-m.dx)} ${n2(-m.dy)})';
 
 /// The item as markup in character space, or '' when it doesn't apply.
 String placeItem(CritterAnchors a, CritterItem it) {
@@ -28,7 +29,7 @@ String placeItem(CritterAnchors a, CritterItem it) {
     case 'prop':
       return '<g transform="${place(a.side, it.anchor, .8)}">${it.svg}</g>';
     case 'eyes':
-      return '<g transform="translate(${_n(a.eye.dx)} ${_n(a.eye.dy)}) rotate(${_n(a.eyeAngle)})">${lenses(a, it)}</g>';
+      return '<g transform="translate(${n2(a.eye.dx)} ${n2(a.eye.dy)}) rotate(${n2(a.eyeAngle)})">${lenses(a, it)}</g>';
   }
   return '';
 }
@@ -40,10 +41,10 @@ String lenses(CritterAnchors a, CritterItem it) {
   final r = (a.eyeR * 2.3 * it.grow).clamp(5.0, half > 0 ? half * .9 : 99.0);
   final hw = math.min(a.headWidth / 2 + 2, half + r * 2.4); // strap wraps the head, not a long body
   final out = StringBuffer();
-  if (it.strap != null) out.write('<path d="M${_n(-hw)} 0 H${_n(hw)}" stroke="${it.strap}" stroke-width="${_n(r * .4)}" stroke-linecap="round"/>');
-  if (half > 0) out.write('<path d="M${_n(-half + r * .9)} 0 H${_n(half - r * .9)}" stroke="${it.bridge}" stroke-width="${_n(r * .26)}" stroke-linecap="round"/>');
+  if (it.strap != null) out.write('<path d="M${n2(-hw)} 0 H${n2(hw)}" stroke="${it.strap}" stroke-width="${n2(r * .4)}" stroke-linecap="round"/>');
+  if (half > 0) out.write('<path d="M${n2(-half + r * .9)} 0 H${n2(half - r * .9)}" stroke="${it.bridge}" stroke-width="${n2(r * .26)}" stroke-linecap="round"/>');
   for (final x in half > 0 ? [-half, half] : [0.0]) {
-    out.write('<g transform="translate(${_n(x)} 0) scale(${(r / 10 * 10000).round() / 10000})">${it.lens}</g>');
+    out.write('<g transform="translate(${n2(x)} 0) scale(${(r / 10 * 10000).round() / 10000})">${it.lens}</g>');
   }
   return out.toString();
 }

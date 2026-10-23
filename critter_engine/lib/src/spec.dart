@@ -9,6 +9,7 @@ import 'item.dart';
 /// {
 ///   "v": 1,
 ///   "species": "blip", "form": 1, "xp": 230,
+///   "look": "glow",
 ///   "attachments": { "hat": "crown", "eyes": "goggles", "neck": "gold_chain", "prop": "gold_bar" },
 ///   "behaviour": { "likesPets": true, "gait": "waddle", "state": "idle" },
 ///   "items": [ { "id": "viking", "slot": "hat", "svg": "…", "anchor": [50, 62] } ]
@@ -25,6 +26,7 @@ class CritterSpec {
     this.attachments = const CritterAttachments(),
     this.behaviour = const CritterBehaviour(),
     this.items = const [],
+    this.look = CritterLook.flat,
   });
 
   final String species;
@@ -40,6 +42,9 @@ class CritterSpec {
   /// Items defined inline by the backend. Invalid ones are dropped while parsing.
   final List<CritterItem> items;
 
+  /// How the critter is lit. `CritterView(look: …)` overrides it.
+  final CritterLook look;
+
   factory CritterSpec.fromJson(Map<String, dynamic> j) => CritterSpec(
         species: j['species'] as String? ?? '',
         form: (j['form'] as num?)?.toInt() ?? 0,
@@ -49,6 +54,7 @@ class CritterSpec {
         items: [
           for (final raw in j['items'] as List? ?? const []) ?_tryItem(raw),
         ],
+        look: CritterLook.parse(j['look']),
       );
 
   static CritterItem? _tryItem(Object? raw) {
@@ -68,9 +74,10 @@ class CritterSpec {
         'attachments': attachments.toJson(),
         'behaviour': behaviour.toJson(),
         if (items.isNotEmpty) 'items': items.map((i) => i.toJson()).toList(),
+        if (look != CritterLook.flat) 'look': look.name,
       };
 
-  CritterSpec copyWith({String? species, int? form, double? xp, CritterAttachments? attachments, CritterBehaviour? behaviour, List<CritterItem>? items}) =>
+  CritterSpec copyWith({String? species, int? form, double? xp, CritterAttachments? attachments, CritterBehaviour? behaviour, List<CritterItem>? items, CritterLook? look}) =>
       CritterSpec(
         species: species ?? this.species,
         form: form ?? this.form,
@@ -78,15 +85,16 @@ class CritterSpec {
         attachments: attachments ?? this.attachments,
         behaviour: behaviour ?? this.behaviour,
         items: items ?? this.items,
+        look: look ?? this.look,
       );
 
   @override
   bool operator ==(Object other) =>
       other is CritterSpec && other.species == species && other.form == form && other.xp == xp &&
-      other.attachments == attachments && other.behaviour == behaviour && listEquals(other.items, items);
+      other.attachments == attachments && other.behaviour == behaviour && listEquals(other.items, items) && other.look == look;
 
   @override
-  int get hashCode => Object.hash(species, form, xp, attachments, behaviour, Object.hashAll(items));
+  int get hashCode => Object.hash(species, form, xp, attachments, behaviour, Object.hashAll(items), look);
 }
 
 /// Item id per slot; null means nothing in that slot. Ids that the catalog doesn't know are skipped at render time.
@@ -138,4 +146,13 @@ class CritterBehaviour {
 
   @override
   int get hashCode => Object.hash(likesPets, gait, state);
+}
+
+/// `flat`: plain print colours. `glow`: shaded, glossy bodies, eye glints, a soft contact shadow and a
+/// colour halo behind the critter (looks best on a dark background). Unknown values mean `flat`.
+enum CritterLook {
+  flat,
+  glow;
+
+  static CritterLook parse(Object? v) => values.firstWhere((l) => l.name == v, orElse: () => flat);
 }

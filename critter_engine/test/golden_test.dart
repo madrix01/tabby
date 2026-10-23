@@ -59,6 +59,32 @@ void main() {
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/evolution.png'));
   });
 
+  testWidgets('glow look on a dark stage', (tester) async {
+    tester.view.physicalSize = const Size(1200, 330);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final cells = [
+      for (final (sp, f, items) in [
+        ('blip', 0, const CritterAttachments()),
+        ('pip', 2, const CritterAttachments(hat: 'crown', eyes: 'round')),
+        ('squidge', 3, const CritterAttachments(neck: 'gold_chain', prop: 'gold_bar')),
+        ('sprig', 1, const CritterAttachments(hat: 'party', eyes: 'goggles', prop: 'money_bag')),
+      ])
+        CritterView(catalog: catalog, look: CritterLook.glow, spec: CritterSpec(species: sp, form: f, attachments: items)),
+    ];
+    await tester.pumpWidget(MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: DecoratedBox(
+        // a spotlight from above, like the reference render; the stage is the host app's job, not the engine's
+        decoration: const BoxDecoration(gradient: RadialGradient(center: Alignment(0, -1.1), radius: 1.3,
+            colors: [Color(0xff6b5a48), Color(0xff221c18), Color(0xff0e0c0b)], stops: [0, .55, 1])),
+        child: GridView.count(crossAxisCount: 4, childAspectRatio: 4 / 3, padding: const EdgeInsets.all(8), children: cells),
+      ),
+    ));
+    await settle(tester);
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/glow.png'));
+  });
+
   testWidgets('items sent as JSON', (tester) async {
     tester.view.physicalSize = const Size(1200, 330);
     tester.view.devicePixelRatio = 1;

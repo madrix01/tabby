@@ -72,6 +72,7 @@ SizedBox(
   "xp": 400,
   "attachments": { "hat": "crown", "eyes": "shades", "neck": "gold_chain", "prop": "money_bag" },
   "behaviour": { "likesPets": true, "gait": "waddle", "state": "idle" },
+  "look": "glow",
   "items": []
 }
 ```
@@ -83,6 +84,7 @@ SizedBox(
 | `xp` | Optional. Only grows the critter slightly within its current form. It does **not** change `form`. |
 | `attachments` | One item id per slot: `hat`, `eyes`, `neck`, `prop`. A missing slot means empty. |
 | `behaviour` | Parsed and carried through, but not used for rendering yet (reserved for animation). |
+| `look` | `"flat"` (default) or `"glow"`: shaded glossy bodies, eye glints, a contact shadow and a colour halo. Use it on dark backgrounds. `CritterView(look: CritterLook.glow)` overrides the spec. |
 | `items` | Optional inline item definitions; see section 5. |
 
 Missing fields get defaults, and unknown ids are ignored. Values of the wrong type, such as `"form": "2"`, do throw, so send numbers as numbers.

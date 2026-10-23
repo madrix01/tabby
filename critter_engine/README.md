@@ -26,6 +26,16 @@ CritterView(catalog: catalog, spec: CritterSpec.fromJson(payload));
 - **`attachments`:** item ids. They resolve against this spec's `items` first, then the catalog. Unknown ids are skipped.
 - **`behaviour`:** carried through for the animation layer (phase 3).
 
+## Look
+
+Set `"look": "glow"` in the spec, or pass `CritterView(look: CritterLook.glow)` to override it. Glow mode adds:
+- bodies shaded from light (top-left) to dark (bottom)
+- a glossy highlight and glints in round eyes
+- a soft contact shadow under the feet
+- a colour halo: a blurred, brightened copy of the critter drawn behind it, so a flame glows orange and a blue body glows blue
+
+It reads best on a dark background. The background or stage is the host app's job; see the `glow` golden for a spotlight example. `flat` is the default, and unknown values fall back to it.
+
 ## Items as JSON
 
 | slot | fields |
