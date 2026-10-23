@@ -52,7 +52,7 @@ void main() {
         }
       }
     }
-    expect(count, 40 * 17);
+    expect(count, 40 * CritterItem.slots.map((s) => catalog.itemIds(s).length).reduce((a, b) => a + b));
   });
 
   test('glow look: every species x form composes, parses and only adds lighting', () {
@@ -123,6 +123,43 @@ void main() {
     expect(early, lessThan(late));
     expect(late, lessThan(evolved));
     expect(formScale(blip, 0, null), blip.forms[0].minScale);
+  });
+
+  group('moods', () {
+    test('parsed from json, unknown means none', () {
+      expect(CritterSpec.fromJson({'species': 'blip', 'mood': 'travel'}).mood, CritterMood.travel);
+      expect(CritterSpec.fromJson({'species': 'blip', 'mood': 'grumpy'}).mood, isNull);
+      const s = CritterSpec(species: 'blip', mood: CritterMood.sad);
+      expect(CritterSpec.fromJson(s.toJson()), s);
+      expect(s.copyWith(clearMood: true).mood, isNull);
+    });
+
+    test('every species x form x mood composes and parses cleanly', () {
+      for (final species in catalog.species.values) {
+        for (var form = 0; form < species.forms.length; form++) {
+          for (final mood in CritterMood.values) {
+            final comp = compose(catalog, CritterSpec(species: species.id, form: form, mood: mood, attachments: const CritterAttachments(hat: 'cap')))!;
+            for (final layer in [comp.base, comp.eyes, comp.overlay, ?comp.prop]) {
+              vg.parseWithoutOptimizers(layer, key: '${species.id}/$form/${mood.name}', warningsAsErrors: true);
+            }
+          }
+        }
+      }
+    });
+
+    test('a mood swaps the mouth, adds its extras, and entertainment wears 3D glasses', () {
+      const spec = CritterSpec(species: 'pip', form: 2, attachments: CritterAttachments(eyes: 'round'));
+      final plain = compose(catalog, spec)!, tri = catalog.characters['15']!;
+      final mouthD = tri.ink.firstWhere((p) => p.mouth).d!;
+      expect(plain.base, contains(mouthD));
+      final sad = compose(catalog, spec.copyWith(mood: CritterMood.sad))!;
+      expect(sad.base, isNot(contains(mouthD)), reason: 'own mouth replaced');
+      expect(sad.prop, contains('#9aa3ad'), reason: 'rain cloud');
+      final fun = compose(catalog, spec.copyWith(mood: CritterMood.entertainment))!;
+      expect(fun.overlay, allOf(contains('#e8494b'), contains('#3a85f2')), reason: 'red + blue lenses');
+      expect(fun.overlay, isNot(contains('fill-opacity=".33"')), reason: 'replaces the round glasses');
+      expect(compose(catalog, spec.copyWith(mood: CritterMood.shopping))!.prop, contains('#c94d7f'), reason: 'bags');
+    });
   });
 
   group('items sent as JSON', () {

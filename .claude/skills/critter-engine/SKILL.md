@@ -1,6 +1,6 @@
 ---
 name: critter-engine
-description: Add and use the critter_engine Flutter package (github.com/madrix01/tabby) to render evolving pet critters with hats, eyewear, neck items and props from a JSON spec. Use when installing critter_engine, rendering a CritterView, building or validating critter JSON payloads (species, form, attachments, inline items), defining custom items as JSON, using the glow look (glow, halo, shadow, shading), or adding new characters or items to the catalog.
+description: Add and use the critter_engine Flutter package (github.com/madrix01/tabby) to render evolving pet critters with hats, eyewear, neck items and props from a JSON spec. Use when installing critter_engine, rendering a CritterView, building or validating critter JSON payloads (species, form, attachments, inline items), defining custom items as JSON, using the glow look (glow, halo, shadow, shading), setting a mood (happy, sad, food, entertainment, travel, shopping), or adding new characters or items to the catalog.
 ---
 
 # critter_engine
@@ -72,6 +72,7 @@ SizedBox(
   "xp": 400,
   "attachments": { "hat": "crown", "eyes": "shades", "neck": "gold_chain", "prop": "money_bag" },
   "behaviour": { "likesPets": true, "gait": "waddle", "state": "idle" },
+  "mood": "travel",
   "look": "glow",
   "items": []
 }
@@ -84,6 +85,7 @@ SizedBox(
 | `xp` | Optional. Only grows the critter slightly within its current form. It does **not** change `form`. |
 | `attachments` | One item id per slot: `hat`, `eyes`, `neck`, `prop`. A missing slot means empty. |
 | `behaviour` | Parsed and carried through, but not used for rendering yet (reserved for animation). |
+| `mood` | `happy`, `sad`, `food`, `entertainment`, `travel` or `shopping` (see below). Leave it out for the critter's own face. |
 | `look` | `"flat"` (default) or `"glow"`: shaded glossy bodies, eye glints, a contact shadow and a colour halo. Use it on dark backgrounds. `CritterView(look: CritterLook.glow)` overrides the spec. |
 | `glow` | Optional tuning for the glow look. The defaults are `halo` 0.35 (range 0–1), `blur` 0.8 (0–3), `brightness` 1 (1–2), `shading` 1.5, `gloss` 0.45 and `shadow` 1.5 (each 0–1.5, where 0 = off), and `color` `#rrggbb` to tint the halo. Values are clamped and missing knobs keep their defaults. `CritterView(glow: CritterGlow(...))` overrides it. |
 | `items` | Optional inline item definitions; see section 5. |
@@ -120,7 +122,7 @@ Pick one source of truth for `form`, server or client. If both compute it, they 
 | slot | ids |
 |---|---|
 | `hat` | top_hat, party, crown, cap, beanie, chef |
-| `eyes` | goggles, shades, round, hearts |
+| `eyes` | goggles, shades, round, hearts, three_d |
 | `neck` | bow_tie, gold_chain, medal |
 | `prop` | gold_bar, gold_stack, money_bag, coffee |
 
@@ -135,6 +137,7 @@ Any slot can use items defined by the backend. An item is placed on every charac
 { "id": "scarf",  "slot": "neck", "anchor": [50, 0], "fit": 0.8, "height": 40, "svg": "…" }
 { "id": "rock",   "slot": "prop", "anchor": [0, 0], "svg": "<path d='M0 0 Q4 -26 24 -28 Q46 -26 48 0Z' fill='#9aa0a6'/>" }
 { "id": "visor",  "slot": "eyes", "lens": "<rect x='-12' y='-6' width='24' height='12' rx='6' fill='#3a85f2'/>", "grow": 1.3, "bridge": "#3a85f2", "strap": "#2b2a33" }
+{ "id": "3d",     "slot": "eyes", "lens": "<rect … fill='#e8494b'/>", "lensRight": "<rect … fill='#3a85f2'/>" }
 ```
 
 How to draw them:
@@ -142,7 +145,7 @@ How to draw them:
   - hat: the bottom-centre of the brim; this point sits on the head.
   - neck: the top-centre; this point sits under the mouth. `fit` sets the width as a fraction of the neck (default 0.5), and `height` is the drawn height, which keeps the item above the feet.
   - prop: the bottom-left corner; the prop stands on the ground beside the feet. Draw it upwards, using negative y.
-- **eyes:** draw **one lens centred on (0,0) at radius 10**. It is copied onto each eye and scaled to that eye's size. One-eyed critters get a single lens. `bridge` is the colour of the bar between the lenses, `strap` is optional, and `grow` makes the lenses bigger or smaller (default 1.15).
+- **eyes:** draw **one lens centred on (0,0) at radius 10**. It is copied onto each eye and scaled to that eye's size. One-eyed critters get a single lens. `lensRight` (optional) is a different lens for the right eye, as in 3D glasses. `bridge` is the colour of the bar between the lenses, `strap` is optional, and `grow` makes the lenses bigger or smaller (default 1.15).
 
 There are two ways to provide items:
 ```dart
@@ -163,7 +166,27 @@ Item SVG comes over the network, so it is validated, and anything outside these 
 
 A bad inline item is dropped, with a debug message, and the critter still renders.
 
-## 6. Glow look (halo, shading, shadow)
+## 6. Moods
+
+```json
+{ "species": "lemon", "form": 1, "mood": "travel" }
+```
+
+| mood | face | around it |
+|---|---|---|
+| `happy` | big grin, pink cheeks | |
+| `sad` | frown, worried brows, a tear | rain cloud above the head (it clears a hat) |
+| `food` | chewing mouth | burger thought bubble |
+| `entertainment` | big grin, wears red and blue `three_d` glasses (replacing the spec's eyewear) | popcorn thought bubble |
+| `travel` | soft smile | plane thought bubble, suitcase on the ground |
+| `shopping` | excited open mouth | shopping-bag thought bubble, shopping bags on the ground |
+
+- The mood's mouth replaces the character's own, and works for one-eyed and mouthless characters too.
+- Hats, neck items and props still apply. A ground item from a mood (suitcase, bags) stands on the left, so it doesn't collide with the prop on the right.
+- In code, `spec.copyWith(mood: CritterMood.sad)` sets a mood and `copyWith(clearMood: true)` removes it.
+- Motion such as bouncing, floating notes and falling rain isn't drawn by the package yet; it is static for now. `v3/index.html` shows the animated version.
+
+## 7. Glow look (halo, shading, shadow)
 
 Glow is a lit, glossy render. It adds:
 - bodies shaded from light to dark
@@ -204,13 +227,13 @@ Tips:
 - **Tuning by eye:** `v3/index.html` in the repo has a **Glow** toggle with live sliders for every knob, and it uses the same defaults. Tune it there, then copy the numbers into your JSON.
 - **Bad values:** they are safe. Out-of-range numbers are clamped, and an invalid `color` is ignored.
 
-## 7. Limits to know before building on it
+## 8. Limits to know before building on it
 - **No animation yet.** `CritterView` is static. Gaits, blinking, petting, dancing and the evolution flash exist in the browser prototype (`v3/index.html`) and are planned for the package. `behaviour` is parsed for that future use.
 - **One item per slot.** A critter can't hold a money bag and a gold bar at once.
-- **Art comes from the catalog.** New characters need the compiler (section 8); they can't be sent as JSON.
+- **Art comes from the catalog.** New characters need the compiler (section 9); they can't be sent as JSON.
 - **Two-headed character 23** (Twinny in the `ember` line): it gets its hat between the heads and its glasses spanning both.
 
-## 8. Adding characters or bundled items (repo maintainers)
+## 9. Adding characters or bundled items (repo maintainers)
 
 ```bash
 cd compiler && npm install && npm run build   # rebuilds critter_engine/assets/critter_catalog.json

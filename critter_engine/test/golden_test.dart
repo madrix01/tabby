@@ -108,6 +108,20 @@ void main() {
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/glow_knobs.png'));
   });
 
+  testWidgets('moods', (tester) async {
+    tester.view.physicalSize = const Size(1500, 330);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(board(columns: 6, [
+      for (final (sp, f, mood) in [('blip', 1, 'happy'), ('pinky', 1, 'sad'), ('squidge', 2, 'food'),
+                                   ('pip', 2, 'entertainment'), ('lemon', 1, 'travel'), ('drip', 2, 'shopping')])
+        CritterView(catalog: catalog, spec: CritterSpec.fromJson({'species': sp, 'form': f, 'mood': mood,
+            if (mood == 'sad') 'attachments': {'hat': 'beanie'}})),
+    ]));
+    await settle(tester);
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/moods.png'));
+  });
+
   testWidgets('items sent as JSON', (tester) async {
     tester.view.physicalSize = const Size(1200, 330);
     tester.view.devicePixelRatio = 1;

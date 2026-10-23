@@ -108,12 +108,19 @@ class CritterCharacter {
 /// Points measured on a character by the compiler, in character space.
 class CritterAnchors {
   const CritterAnchors({
-    required this.eye, required this.eyeSpan, required this.eyeAngle, required this.eyeR, required this.headWidth,
+    required this.eye, required this.eyes, required this.mouthAt, required this.mouthWidth, required this.eyeSpan, required this.eyeAngle, required this.eyeR, required this.headWidth,
     required this.hatAt, required this.hatWidth, required this.neck, required this.neckWidth, required this.side,
   });
 
   /// Midpoint between the eyes; [eyeSpan] = distance between them (0 for one-eyed critters).
   final Offset eye;
+
+  /// Each eye's centre (one entry for one-eyed critters).
+  final List<Offset> eyes;
+
+  /// Centre and width of the mouth (or a stand-in under a lone eye); moods draw their mouth here.
+  final Offset mouthAt;
+  final double mouthWidth;
   final double eyeSpan, eyeAngle, eyeR, headWidth;
 
   /// Where a hat sits (bottom-centre of the hat) and how wide it should be.
@@ -130,7 +137,9 @@ class CritterAnchors {
     double d(String k) => (j[k] as num).toDouble();
     final hat = j['hat'] as Map<String, dynamic>;
     return CritterAnchors(
-      eye: o(j['eye']), eyeSpan: d('eyeSpan'), eyeAngle: d('eyeAngle'), eyeR: d('eyeR'), headWidth: d('headWidth'),
+      eye: o(j['eye']), eyes: [for (final e in j['eyes'] as List) o(e)],
+      mouthAt: o((j['mouth'] as Map<String, dynamic>)['at']), mouthWidth: ((j['mouth'] as Map<String, dynamic>)['width'] as num).toDouble(),
+      eyeSpan: d('eyeSpan'), eyeAngle: d('eyeAngle'), eyeR: d('eyeR'), headWidth: d('headWidth'),
       hatAt: o(hat['at']), hatWidth: (hat['width'] as num).toDouble(), neck: o(j['neck']), neckWidth: d('neckWidth'), side: o(j['side']),
     );
   }
@@ -142,13 +151,13 @@ class SkinPart {
   final String? fillRule;
 }
 
-/// A face mark in the ink colour: a path or a circle. [eye] marks the ones that blink.
+/// A face mark in the ink colour: a path or a circle. [eye] marks the ones that blink, [mouth] the ones a mood replaces.
 class InkPart {
-  const InkPart({this.d, this.cx = 0, this.cy = 0, this.r = 0, this.fillRule, required this.eye});
+  const InkPart({this.d, this.cx = 0, this.cy = 0, this.r = 0, this.fillRule, required this.eye, this.mouth = false});
   final String? d;
   final double cx, cy, r;
   final String? fillRule;
-  final bool eye;
+  final bool eye, mouth;
 
   factory InkPart.fromJson(Map<String, dynamic> j) => InkPart(
         d: j['d'] as String?,
@@ -157,6 +166,7 @@ class InkPart {
         r: (j['r'] as num?)?.toDouble() ?? 0,
         fillRule: j['fillRule'] as String?,
         eye: j['eye'] as bool,
+        mouth: j['mouth'] as bool? ?? false,
       );
 }
 

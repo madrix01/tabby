@@ -41,7 +41,7 @@ export const PROPS = {
 };
 
 // eyewear: one lens template per eye, drawn centred on (0,0) at radius 10; placed on each eye at a radius taken from the eye size.
-// grow = lens size vs eye, bridge = colour of the bar between lenses, strap = optional band across the head.
+// grow = lens size vs eye, bridge = colour of the bar between lenses, strap = optional band across the head, lensRight = optional different right lens.
 // This declarative shape is what runtime (JSON) eyewear uses too, so no per-item code is needed.
 export const EYEWEAR = {
   goggles: { grow:1.25, bridge:'#e8494b', strap:'#2b2a33',
@@ -50,6 +50,10 @@ export const EYEWEAR = {
     lens:`<rect x="-11" y="-7.5" width="22" height="15" rx="4.5" fill="#2b2a33"/><path d="M-6 -3 h5" stroke="#ffffff" stroke-opacity=".6" stroke-width="1.5" stroke-linecap="round"/>` },
   round:   { grow:1.05, bridge:'#2b2a33',
     lens:`<circle r="10" fill="#ffffff" fill-opacity=".33" stroke="#2b2a33" stroke-width="2.6"/>` },
+  // 3D movie glasses: red left lens, blue right lens (lensRight = a different lens for the right eye)
+  three_d: { grow:1.15, bridge:'#f4f1ea',
+    lens:`<rect x="-11" y="-7.5" width="22" height="15" rx="3" fill="#e8494b" fill-opacity=".85" stroke="#f4f1ea" stroke-width="3"/>`,
+    lensRight:`<rect x="-11" y="-7.5" width="22" height="15" rx="3" fill="#3a85f2" fill-opacity=".85" stroke="#f4f1ea" stroke-width="3"/>` },
   hearts:  { grow:1.2,  bridge:'#f2679b',
     lens:`<path transform="translate(0 -1.5) scale(0.5556)" d="M0 18 C-30 -2 -16 -22 0 -8 C16 -22 30 -2 0 18Z" fill="#f2679b"/>` },
 };

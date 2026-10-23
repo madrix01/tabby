@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'glow.dart';
 import 'item.dart';
+import 'mood.dart';
 
 /// What the backend sends to describe one critter. Tolerant by design: unknown or
 /// missing values fall back to defaults instead of throwing, so older apps keep rendering.
@@ -10,6 +11,7 @@ import 'item.dart';
 /// {
 ///   "v": 1,
 ///   "species": "blip", "form": 1, "xp": 230,
+///   "mood": "travel",
 ///   "look": "glow",
 ///   "glow": { "halo": 0.85, "blur": 1, "shading": 1, "gloss": 1, "shadow": 1 },
 ///   "attachments": { "hat": "crown", "eyes": "goggles", "neck": "gold_chain", "prop": "gold_bar" },
@@ -30,6 +32,7 @@ class CritterSpec {
     this.items = const [],
     this.look = CritterLook.flat,
     this.glow = const CritterGlow(),
+    this.mood,
   });
 
   final String species;
@@ -51,6 +54,9 @@ class CritterSpec {
   /// Tuning for the glow look; ignored when [look] is flat.
   final CritterGlow glow;
 
+  /// happy / sad / food / entertainment / travel / shopping, or null for the critter's own face.
+  final CritterMood? mood;
+
   factory CritterSpec.fromJson(Map<String, dynamic> j) => CritterSpec(
         species: j['species'] as String? ?? '',
         form: (j['form'] as num?)?.toInt() ?? 0,
@@ -62,6 +68,7 @@ class CritterSpec {
         ],
         look: CritterLook.parse(j['look']),
         glow: CritterGlow.fromJson(j['glow'] as Map<String, dynamic>? ?? const {}),
+        mood: CritterMood.parse(j['mood']),
       );
 
   static CritterItem? _tryItem(Object? raw) {
@@ -83,9 +90,10 @@ class CritterSpec {
         if (items.isNotEmpty) 'items': items.map((i) => i.toJson()).toList(),
         if (look != CritterLook.flat) 'look': look.name,
         if (glow != const CritterGlow()) 'glow': glow.toJson(),
+        if (mood != null) 'mood': mood!.name,
       };
 
-  CritterSpec copyWith({String? species, int? form, double? xp, CritterAttachments? attachments, CritterBehaviour? behaviour, List<CritterItem>? items, CritterLook? look, CritterGlow? glow}) =>
+  CritterSpec copyWith({String? species, int? form, double? xp, CritterAttachments? attachments, CritterBehaviour? behaviour, List<CritterItem>? items, CritterLook? look, CritterGlow? glow, CritterMood? mood, bool clearMood = false}) =>
       CritterSpec(
         species: species ?? this.species,
         form: form ?? this.form,
@@ -95,15 +103,16 @@ class CritterSpec {
         items: items ?? this.items,
         look: look ?? this.look,
         glow: glow ?? this.glow,
+        mood: clearMood ? null : mood ?? this.mood,
       );
 
   @override
   bool operator ==(Object other) =>
       other is CritterSpec && other.species == species && other.form == form && other.xp == xp &&
-      other.attachments == attachments && other.behaviour == behaviour && listEquals(other.items, items) && other.look == look && other.glow == glow;
+      other.attachments == attachments && other.behaviour == behaviour && listEquals(other.items, items) && other.look == look && other.glow == glow && other.mood == mood;
 
   @override
-  int get hashCode => Object.hash(species, form, xp, attachments, behaviour, Object.hashAll(items), look, glow);
+  int get hashCode => Object.hash(species, form, xp, attachments, behaviour, Object.hashAll(items), look, glow, mood);
 }
 
 /// Item id per slot; null means nothing in that slot. Ids that the catalog doesn't know are skipped at render time.

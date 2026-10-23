@@ -4,6 +4,7 @@ import 'catalog.dart';
 import 'glow.dart';
 import 'growth.dart';
 import 'item.dart';
+import 'mood.dart';
 import 'placement.dart';
 import 'spec.dart';
 
@@ -13,7 +14,7 @@ import 'spec.dart';
 /// * [base]    skin + mouth
 /// * [eyes]    the blinking eyes (scale Y around [eyeLineY])
 /// * [overlay] neck item, eyewear, hat (above the eyes, moves with the body)
-/// * [prop]    ground prop (not tilted with the body); null when empty
+/// * [prop]    ground prop and mood extras (thought bubble, rain cloud, ground item); not tilted with the body; null when empty
 class CritterComposition {
   const CritterComposition({
     required this.base,
@@ -65,6 +66,7 @@ CritterComposition? compose(CritterCatalog catalog, CritterSpec spec, {CritterLo
   String mark(InkPart p) => p.d != null
       ? '<path d="${p.d}" fill="$ink"${rule(p.fillRule)}/>'
       : '<circle cx="${p.cx}" cy="${p.cy}" r="${p.r}" fill="$ink"/>';
+  final mood = spec.mood == null ? null : moodStyles[spec.mood];
   String placed(String slot, String? id) {
     if (id == null) return '';
     final CritterItem? it = spec.items.where((i) => i.slot == slot && i.id == id).firstOrNull ?? catalog.item(slot, id);
@@ -77,11 +79,12 @@ CritterComposition? compose(CritterCatalog catalog, CritterSpec spec, {CritterLo
   } else {
     base.writeAll(c.skin.map((p) => '<path d="${p.d}" fill="${p.fill}"${rule(p.fillRule)}/>'));
   }
-  base.writeAll(c.ink.where((p) => !p.eye).map(mark));
+  base.writeAll(c.ink.where((p) => !p.eye && !(mood != null && p.mouth)).map(mark)); // a mood draws its own mouth
+  if (mood != null) base.write(moodFace(mood, c.anchors));
   // glossy eyes: a small glint on round eyes
   String eye(InkPart p) => mark(p) + (lit && tune.gloss > 0 && p.d == null ? '<circle cx="${n2(p.cx + p.r * .32)}" cy="${n2(p.cy - p.r * .32)}" r="${n2(p.r * .32)}" fill="#ffffff"/>' : '');
-  final overlay = placed('neck', a.neck) + placed('eyes', a.eyes) + placed('hat', a.hat);
-  final prop = placed('prop', a.prop);
+  final overlay = placed('neck', a.neck) + placed('eyes', mood?.eyewear ?? a.eyes) + placed('hat', a.hat);
+  final prop = placed('prop', a.prop) + (mood == null ? '' : moodExtras(mood, c, hatWorn: a.hat != null));
 
   final vb = CritterComposition.viewBox;
   String svg(String body) =>

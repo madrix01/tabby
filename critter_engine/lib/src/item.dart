@@ -10,11 +10,13 @@ import 'package:flutter/foundation.dart';
 /// { "id": "scarf",  "slot": "neck", "svg": "…", "anchor": [50, 0], "fit": 0.6, "height": 30 }
 /// { "id": "rock",   "slot": "prop", "svg": "…", "anchor": [0, 0] }
 /// { "id": "visor",  "slot": "eyes", "lens": "<circle r='10' …/>", "grow": 1.2, "bridge": "#2b2a33", "strap": "#2b2a33" }
+/// { "id": "3d",     "slot": "eyes", "lens": "<rect … fill='#e8494b'/>", "lensRight": "<rect … fill='#3a85f2'/>" }
 /// ```
 ///
 /// hat / neck / prop: draw ~100 units wide; `anchor` is the point that lands on the character
 /// (bottom-centre of a hat, top-centre of a necklace, bottom-left of a prop).
 /// eyes: one lens drawn centred on (0,0) at radius 10; it is copied onto every eye and scaled to it.
+/// `lensRight` (optional) is used for the right eye instead, e.g. 3D glasses.
 @immutable
 class CritterItem {
   const CritterItem({
@@ -25,6 +27,7 @@ class CritterItem {
     this.fit = .5,
     this.height = 40,
     this.lens = '',
+    this.lensRight,
     this.grow = 1.15,
     this.bridge = '#2b2a33',
     this.strap,
@@ -43,6 +46,7 @@ class CritterItem {
 
   // eyes
   final String lens;
+  final String? lensRight;
   final double grow;
   final String bridge;
   final String? strap;
@@ -57,6 +61,7 @@ class CritterItem {
       return CritterItem(
         id: id, slot: slot,
         lens: checkSvgFragment(j['lens'], '$id.lens'),
+        lensRight: j['lensRight'] == null ? null : checkSvgFragment(j['lensRight'], '$id.lensRight'),
         grow: num_('grow', 1.15).clamp(.3, 3),
         bridge: _color(j['bridge'] ?? '#2b2a33', '$id.bridge'),
         strap: j['strap'] == null ? null : _color(j['strap'], '$id.strap'),
@@ -76,18 +81,18 @@ class CritterItem {
   Map<String, dynamic> toJson() => {
         'id': id,
         'slot': slot,
-        if (slot == 'eyes') ...{'lens': lens, 'grow': grow, 'bridge': bridge, 'strap': ?strap}
+        if (slot == 'eyes') ...{'lens': lens, 'lensRight': ?lensRight, 'grow': grow, 'bridge': bridge, 'strap': ?strap}
         else ...{'svg': svg, 'anchor': [anchor.dx, anchor.dy], if (slot == 'neck') ...{'fit': fit, 'height': height}},
       };
 
   @override
   bool operator ==(Object other) =>
       other is CritterItem && other.id == id && other.slot == slot && other.svg == svg && other.anchor == anchor &&
-      other.fit == fit && other.height == height && other.lens == lens && other.grow == grow && other.bridge == bridge &&
+      other.fit == fit && other.height == height && other.lens == lens && other.lensRight == lensRight && other.grow == grow && other.bridge == bridge &&
       other.strap == strap;
 
   @override
-  int get hashCode => Object.hash(id, slot, svg, anchor, fit, height, lens, grow, bridge, strap);
+  int get hashCode => Object.hash(id, slot, svg, anchor, fit, height, lens, lensRight, grow, bridge, strap);
 }
 
 const _allowedTags = {'path', 'circle', 'ellipse', 'rect', 'polygon', 'polyline', 'line', 'g'};

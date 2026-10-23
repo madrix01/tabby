@@ -17,6 +17,7 @@ CritterView(catalog: catalog, spec: CritterSpec.fromJson(payload));
   "species": "pip", "form": 2, "xp": 230,
   "attachments": { "hat": "viking", "eyes": "goggles", "neck": "gold_chain", "prop": "gold_bar" },
   "behaviour": { "likesPets": true, "gait": "waddle", "state": "idle" },
+  "mood": "travel",
   "items": [ { "id": "viking", "slot": "hat", "anchor": [50, 62], "svg": "<path d='…' fill='#9aa0a6'/>" } ]
 }
 ```
@@ -25,6 +26,21 @@ CritterView(catalog: catalog, spec: CritterSpec.fromJson(payload));
 - **`xp`:** optional. It only grows the critter slightly within its current form.
 - **`attachments`:** item ids. They resolve against this spec's `items` first, then the catalog. Unknown ids are skipped.
 - **`behaviour`:** carried through for the animation layer (phase 3).
+
+## Mood
+
+`"mood"` is one of `happy`, `sad`, `food`, `entertainment`, `travel` or `shopping`. Leave it out for the critter's own face; unknown values are ignored.
+
+| mood | face | around it |
+|---|---|---|
+| `happy` | big grin, pink cheeks | |
+| `sad` | frown, worried brows, a tear | rain cloud above the head (above the hat if one is worn) |
+| `food` | chewing mouth | burger thought bubble |
+| `entertainment` | big grin, wears the `three_d` glasses (replacing any eyewear) | popcorn thought bubble |
+| `travel` | soft smile | plane thought bubble, suitcase on the ground |
+| `shopping` | excited open mouth | shopping-bag thought bubble, shopping bags on the ground |
+
+The mood's mouth replaces the character's own. The bubble, cloud and ground item are on the prop layer, so they don't tilt with the body. Motion effects (bouncing, floating notes, falling rain) are in the browser prototype and come to the package with the animation layer.
 
 ## Look
 
@@ -60,7 +76,7 @@ Out-of-range values are clamped, and missing knobs keep their defaults. The `glo
 | `hat` | `svg` drawn about 100 wide, `anchor` = bottom-centre of the hat |
 | `neck` | `svg`, `anchor` = top-centre, `fit` = width as a fraction of the neck, `height` = drawn height |
 | `prop` | `svg`, `anchor` = bottom-left of the prop; it stands on the ground beside the feet |
-| `eyes` | `lens` = one lens centred on (0,0) at radius 10, `grow`, `bridge` colour, optional `strap` colour |
+| `eyes` | `lens` = one lens centred on (0,0) at radius 10, optional `lensRight` (a different lens for the right eye, e.g. 3D glasses), `grow`, `bridge` colour, optional `strap` colour |
 
 Every character places every item automatically from its measured anchors. You never position an item per character.
 

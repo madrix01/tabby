@@ -44,7 +44,7 @@ function analyze(c){
   const ink = c.ink.map((e, idx) => {
     const b = e.tag === 'circle' ? { x0: e.cx - e.r, y0: e.cy - e.r, x1: e.cx + e.r, y1: e.cy + e.r } : bboxOf(sample(e, 200));
     const [x0, y0] = N([b.x0, b.y0]), [x1, y1] = N([b.x1, b.y1]);
-    return { idx, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, r: Math.max(x1 - x0, y1 - y0) / 2, bottom: y1 };
+    return { idx, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, r: Math.max(x1 - x0, y1 - y0) / 2, bottom: y1, w: x1 - x0 };
   });
   let eyes = ink, mouth = [];
   if (ink.length === 2 && Math.abs(ink[0].cy - ink[1].cy) > Math.abs(ink[0].cx - ink[1].cx) * .8) { const [a, b] = [...ink].sort((p, q) => p.cy - q.cy); eyes = [a]; mouth = [b]; }
@@ -72,7 +72,10 @@ function analyze(c){
   // neck: under the mouth (or well under a lone eye), centred on the body there
   const mouthBottom = mouth.length ? Math.max(...mouth.map(m => m.bottom)) : ec[1] + Math.max(eyeR * 4, H * .12);
   const neckY = Math.min(mouthBottom + Math.max(4, eyeR * 1.3), -H * .15), neckS = spanAt(neckY, ec[0]);
-  return { s0, cx, bot, W, H, eye: ec, span, angle, eyeR, eyeIdx: eyes.map(e => e.idx), hat, headW,
+  // mouth (moods draw their own here); characters without one get a spot under the eye
+  const mouthC = mouth.length ? [mouth.reduce((a, m) => a + m.cx, 0) / mouth.length, mouth.reduce((a, m) => a + m.cy, 0) / mouth.length] : [ec[0], ec[1] + Math.max(eyeR * 3.2, 9)];
+  const mouthW = mouth.length ? Math.max(...mouth.map(m => m.w)) : Math.max(span * .5, 10);
+  return { s0, cx, bot, W, H, eye: ec, eyes: eyes.map(e => [e.cx, e.cy]), span, angle, eyeR, eyeIdx: eyes.map(e => e.idx), mouthIdx: mouth.map(m => m.idx), mouthC, mouthW, hat, headW,
            neck: [clamp(mid(neckS), ec[0] - headW * .2, ec[0] + headW * .2), neckY], neckW: len(neckS), side: [W / 2 - 4, 0] };
 }
 
@@ -83,7 +86,7 @@ function lenses(A, it){
   const hw = Math.min(A.headW / 2 + 2, half + r * 2.4);       // strap wraps the head, not a long body
   return (it.strap ? `<path d="M${r2(-hw)} 0 H${r2(hw)}" stroke="${it.strap}" stroke-width="${r2(r * .4)}" stroke-linecap="round"/>` : '')
        + (half ? `<path d="M${r2(-half + r * .9)} 0 H${r2(half - r * .9)}" stroke="${it.bridge}" stroke-width="${r2(r * .26)}" stroke-linecap="round"/>` : '')
-       + xs.map(x => `<g transform="translate(${r2(x)} 0) scale(${+(r / 10).toFixed(4)})">${it.lens}</g>`).join('');
+       + xs.map(x => `<g transform="translate(${r2(x)} 0) scale(${+(r / 10).toFixed(4)})">${x > 0 && it.lensRight ? it.lensRight : it.lens}</g>`).join('');
 }
 function attachments(A){
   const out = { hat: {}, eyes: {}, neck: {}, prop: {} };
@@ -106,9 +109,9 @@ for (const file of files) {
     skin: c.skin.map(e => ({ d: norm(e), fill: e.fill, ...(e.rule ? { fillRule: e.rule } : {}) })),
     ink: c.ink.map((e, k) => ({
       ...(e.tag === 'path' ? { d: norm(e) } : { cx: r2((e.cx - A.cx) * A.s0), cy: r2((e.cy - A.bot) * A.s0), r: r2(e.r * A.s0) }),
-      ...(e.rule ? { fillRule: e.rule } : {}), eye: A.eyeIdx.includes(k) })),
+      ...(e.rule ? { fillRule: e.rule } : {}), eye: A.eyeIdx.includes(k), mouth: A.mouthIdx.includes(k) })),
     // everything the engine needs to place any item, including ones it only receives at runtime
-    anchors: { eye: A.eye.map(r2), eyeSpan: r2(A.span), eyeAngle: r2(A.angle), eyeR: r2(A.eyeR), headWidth: r2(A.headW),
+    anchors: { eye: A.eye.map(r2), eyes: A.eyes.map(p => p.map(r2)), mouth: { at: A.mouthC.map(r2), width: r2(A.mouthW) }, eyeSpan: r2(A.span), eyeAngle: r2(A.angle), eyeR: r2(A.eyeR), headWidth: r2(A.headW),
                hat: { at: A.hat.at.map(r2), width: r2(A.hat.w) }, neck: A.neck.map(r2), neckWidth: r2(A.neckW), side: A.side.map(r2) },
     attach: attachments(A),   // pre-computed placements of the bundled items: used by the gallery and as a parity oracle for the engine's maths
   };
@@ -130,7 +133,7 @@ const catalog = {
     hat:  Object.fromEntries(Object.entries(HATS).map(([k, v]) => [k, { svg: v.svg, anchor: v.m }])),
     neck: Object.fromEntries(Object.entries(NECK).map(([k, v]) => [k, { svg: v.svg, anchor: v.m, fit: v.fit, height: v.h }])),
     prop: Object.fromEntries(Object.entries(PROPS).map(([k, v]) => [k, { svg: v.svg, anchor: v.m }])),
-    eyes: Object.fromEntries(Object.entries(EYEWEAR).map(([k, v]) => [k, { lens: v.lens, grow: v.grow, bridge: v.bridge, ...(v.strap ? { strap: v.strap } : {}) }])),
+    eyes: Object.fromEntries(Object.entries(EYEWEAR).map(([k, v]) => [k, { lens: v.lens, ...(v.lensRight ? { lensRight: v.lensRight } : {}), grow: v.grow, bridge: v.bridge, ...(v.strap ? { strap: v.strap } : {}) }])),
   },
   species,
 };

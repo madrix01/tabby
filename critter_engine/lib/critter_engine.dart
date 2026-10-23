@@ -7,5 +7,6 @@ export 'src/critter_view.dart';
 export 'src/glow.dart';
 export 'src/growth.dart' show levelOf, xpForLevel, formScale;
 export 'src/item.dart';
+export 'src/mood.dart' show CritterMood;
 export 'src/placement.dart' show placeItem, place;
 export 'src/spec.dart';

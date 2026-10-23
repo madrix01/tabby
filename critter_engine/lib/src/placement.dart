@@ -44,7 +44,7 @@ String lenses(CritterAnchors a, CritterItem it) {
   if (it.strap != null) out.write('<path d="M${n2(-hw)} 0 H${n2(hw)}" stroke="${it.strap}" stroke-width="${n2(r * .4)}" stroke-linecap="round"/>');
   if (half > 0) out.write('<path d="M${n2(-half + r * .9)} 0 H${n2(half - r * .9)}" stroke="${it.bridge}" stroke-width="${n2(r * .26)}" stroke-linecap="round"/>');
   for (final x in half > 0 ? [-half, half] : [0.0]) {
-    out.write('<g transform="translate(${n2(x)} 0) scale(${(r / 10 * 10000).round() / 10000})">${it.lens}</g>');
+    out.write('<g transform="translate(${n2(x)} 0) scale(${(r / 10 * 10000).round() / 10000})">${x > 0 && it.lensRight != null ? it.lensRight : it.lens}</g>');
   }
   return out.toString();
 }
