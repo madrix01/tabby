@@ -1,6 +1,6 @@
 ---
 name: critter-engine
-description: Add and use the critter_engine Flutter package (github.com/madrix01/tabby) to render evolving pet critters with hats, eyewear, neck items and props from a JSON spec. Use when installing critter_engine, rendering a CritterView, building or validating critter JSON payloads (species, form, attachments, inline items), defining custom items as JSON, or adding new characters or items to the catalog.
+description: Add and use the critter_engine Flutter package (github.com/madrix01/tabby) to render evolving pet critters with hats, eyewear, neck items and props from a JSON spec. Use when installing critter_engine, rendering a CritterView, building or validating critter JSON payloads (species, form, attachments, inline items), defining custom items as JSON, using the glow look (glow, halo, shadow, shading), or adding new characters or items to the catalog.
 ---
 
 # critter_engine
@@ -163,13 +163,54 @@ Item SVG comes over the network, so it is validated, and anything outside these 
 
 A bad inline item is dropped, with a debug message, and the critter still renders.
 
-## 6. Limits to know before building on it
+## 6. Glow look (halo, shading, shadow)
+
+Glow is a lit, glossy render. It adds:
+- bodies shaded from light to dark
+- a gloss highlight and glints in round eyes
+- a soft contact shadow
+- a colour halo behind the critter
+
+Turn it on per critter in the JSON, or for a whole screen in code:
+
+```json
+{ "species": "pip", "form": 2, "look": "glow" }
+```
+```dart
+CritterView(catalog: catalog, spec: spec, look: CritterLook.glow);                       // forces glow
+CritterView(catalog: catalog, spec: spec, look: CritterLook.glow,
+    glow: const CritterGlow(halo: .6, blur: 1.5, color: '#ffb347'));                     // forces the tuning too
+```
+
+The defaults are the house look, so plain `"look": "glow"` is usually all you need. Override only what you need, either in the spec's `glow` object or with `CritterGlow(...)`. Missing knobs keep their defaults.
+
+| knob | default | range | effect (0 = off) |
+|---|---|---|---|
+| `halo` | 0.35 | 0–1 | how opaque the halo is |
+| `blur` | 0.8 | 0–3 | how big the halo is (3% of the widget width × blur) |
+| `brightness` | 1 | 1–2 | how much brighter than the critter the halo is; ignored when `color` is set |
+| `shading` | 1.5 | 0–1.5 | light-to-dark body shading (0 = flat colour) |
+| `gloss` | 0.45 | 0–1.5 | the highlight and the eye glints |
+| `shadow` | 1.5 | 0–1.5 | the contact shadow under the feet |
+| `color` | none | `#rrggbb` | paints the halo one colour (for example a warm stage light) instead of the critter's own colours |
+
+Tips:
+- **Background:** glow reads best on a dark background. The engine draws only the critter, so the stage is up to your app. A top spotlight works well:
+  ```dart
+  DecoratedBox(decoration: const BoxDecoration(gradient: RadialGradient(center: Alignment(0, -1.1), radius: 1.3,
+      colors: [Color(0xff6b5a48), Color(0xff221c18), Color(0xff0e0c0b)], stops: [0, .55, 1])), child: ...)
+  ```
+- **Performance:** the halo is a Flutter blur (`ImageFiltered`), which costs a little GPU per critter. For long lists of critters, use `halo: 0` or the flat look.
+- **Tuning by eye:** `v3/index.html` in the repo has a **Glow** toggle with live sliders for every knob, and it uses the same defaults. Tune it there, then copy the numbers into your JSON.
+- **Bad values:** they are safe. Out-of-range numbers are clamped, and an invalid `color` is ignored.
+
+## 7. Limits to know before building on it
 - **No animation yet.** `CritterView` is static. Gaits, blinking, petting, dancing and the evolution flash exist in the browser prototype (`v3/index.html`) and are planned for the package. `behaviour` is parsed for that future use.
 - **One item per slot.** A critter can't hold a money bag and a gold bar at once.
-- **Art comes from the catalog.** New characters need the compiler (section 7); they can't be sent as JSON.
+- **Art comes from the catalog.** New characters need the compiler (section 8); they can't be sent as JSON.
 - **Two-headed character 23** (Twinny in the `ember` line): it gets its hat between the heads and its glasses spanning both.
 
-## 7. Adding characters or bundled items (repo maintainers)
+## 8. Adding characters or bundled items (repo maintainers)
 
 ```bash
 cd compiler && npm install && npm run build   # rebuilds critter_engine/assets/critter_catalog.json
@@ -190,5 +231,6 @@ cd ../critter_engine && flutter test           # parity, svg validity, goldens
 | `Unable to load asset: packages/critter_engine/…` | Stale build after changing the dependency; run `flutter clean && flutter pub get`. |
 | Empty box where the critter should be | Unknown `species` id; check it against the table. |
 | An item doesn't show | Unknown id, wrong `slot`, or the inline item was rejected (check debug output or the result of `registerItems`). |
+| Glow looks washed out or invisible | It's on a light background; glow is designed for dark backgrounds. Lower `halo`, or use the flat look on light screens. |
 | Critter looks tiny | It's a form-0 (baby) form, or the widget is narrow. The frame is shared, so scale with the widget width. |
 | `FormatException: critter catalog vN is newer than this engine` | The catalog and package versions are out of step; update the package. |
