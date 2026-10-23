@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tabby v5</title>
+  <!-- the extension's own stylesheet: colours, pet animations (tilt, blink, wag, ...), controls -->
+  <link rel="stylesheet" href="styles/index.css">
+<style>
+  /* v3 features on top of the extension page: toolbar, moods, growth, glow, send money */
+  #v3ui { position:fixed; top:14px; left:50%; translate:-50% 0; z-index:5; display:flex; flex-wrap:wrap; gap:6px; justify-content:center; align-items:center;
+          max-width:min(780px, 70vw); font:500 13px 'Platform Web', sans-serif; color:#2b2a33; }
+  #v3ui select, #v3ui button, #v3ui input { font:inherit; padding:5px 11px; border-radius:99px; border:0; background:rgba(255,255,255,.55); color:inherit; cursor:pointer; }
+  #v3ui button:hover { background:#fff; }
+  #v3ui label { display:flex; align-items:center; gap:5px; cursor:pointer; }
+  #amount { width:90px; }
+  #xpline { min-width:100%; text-align:center; letter-spacing:.04em; }
+  #xpline progress { width:150px; height:6px; vertical-align:middle; accent-color:#e8494b; }
+  #glowcfg { display:none; min-width:100%; justify-content:center; flex-wrap:wrap; gap:4px 12px; }
+  #glowcfg input[type=range] { width:80px; padding:0; accent-color:#f6c945; }
+  body.glow #glowcfg { display:flex; }
+  /* glow look: dark stage lit from above, shaded + haloed bodies (same knobs as v3 / the Flutter engine) */
+  body.glow #app { background-image:radial-gradient(ellipse 70% 90% at 50% -12%, rgba(255,226,180,.28) 0%, rgba(20,14,10,.62) 55%, rgba(8,6,5,.86) 100%); }
+  body.glow #v3ui { color:#f3ece4; }
+  body.glow #v3ui select, body.glow #v3ui button, body.glow #v3ui input { background:rgba(0,0,0,.35); }
+  body.glow .pet-body-and-head { filter:url(#v-shade) brightness(var(--g-bright)) drop-shadow(0 0 var(--g-blur) var(--g-halo)); }
+  body.glow .pet-shadow { opacity:var(--g-shadow); filter:brightness(.35); }
+  body.glow .pet-name { color:#f3ece4; }
+  .pet { transform-origin:50% 80%; }
+  .v-friend { position:absolute; margin:0; }
+  #fx { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:6; overflow:visible; }
+  .v-float { position:fixed; translate:-50% 0; font:700 24px 'Platform Web', sans-serif; letter-spacing:.04em; pointer-events:none; z-index:7; white-space:nowrap; animation:v-rise 2.2s ease-out forwards; }
+  @keyframes v-rise { 0% { transform:translateY(10px); opacity:0; } 15% { transform:none; opacity:1; } 80% { opacity:1; } 100% { transform:translateY(-50px); opacity:0; } }
+  .spark { font-size:30px; fill:#f6c945; animation:spark 1.2s ease-out forwards; }
+  @keyframes spark { from { transform:translate(0,0) scale(.3); opacity:1; } to { transform:translate(var(--dx),var(--dy)) scale(1.2); opacity:0; } }
+  /* v3 mood effects, sized for the 480-unit pet boxes (v3 critters were ~100 units tall) */
+  .emo  { font:800 34px 'Platform Web', sans-serif; text-anchor:middle; transform-box:fill-box; transform-origin:50% 50%; animation:emoUp 1.6s ease-out forwards; }
+  .heart { font-size:40px; fill:#e8494b; animation:heartUp 1s ease-out forwards; }
+  .rain { stroke:#7fb6e8; stroke-width:4; stroke-linecap:round; animation:rain .7s linear forwards; }
+  .tear { transform-box:fill-box; animation:tear 1.6s ease-in infinite; }
+  .shake { animation:shake 1.4s ease-in-out infinite; }
+  .moth  { animation:mothFly 2.4s ease-out forwards; }
+  .flap  { transform-box:fill-box; transform-origin:50% 50%; animation:flap .12s linear infinite alternate; }
+  .dust  { fill:#b9b2a6; animation:dust .9s ease-in forwards; }
+  .chew  { transform-box:fill-box; transform-origin:50% 50%; animation:chew .3s ease-in-out infinite alternate; }
+  @keyframes emoUp   { 0% { transform:translate(0,0) scale(.6); opacity:0; } 15% { opacity:1; } 100% { transform:translate(var(--dx),-130px) scale(1.1); opacity:0; } }
+  @keyframes heartUp { to { transform:translateY(-130px); opacity:0; } }
+  @keyframes rain    { to { transform:translateY(80px); opacity:0; } }
+  @keyframes tear    { 0% { transform:translateY(0); opacity:0; } 20% { opacity:1; } 100% { transform:translateY(30px); opacity:0; } }
+  @keyframes shake   { 0%, 58%, 100% { transform:rotate(0); } 64% { transform:rotate(-14deg); } 71% { transform:rotate(11deg); } 78% { transform:rotate(-8deg); } 85% { transform:rotate(5deg); } }
+  @keyframes mothFly { 0% { transform:translate(0,0) scale(.6); opacity:0; } 10% { opacity:1; } 40% { transform:translate(var(--dx),-60px) scale(1); }
+                       70% { transform:translate(calc(var(--dx) * -.5),-120px) scale(1); opacity:1; } 100% { transform:translate(var(--dx),-190px) scale(.9); opacity:0; } }
+  @keyframes flap    { to { transform:scaleY(.25); } }
+  @keyframes dust    { to { transform:translateY(60px); opacity:0; } }
+  @keyframes chew    { to { transform:scaleY(.35); } }
+</style>
+</head>
+<body>
+<div id="root"><div id="app" style="height:100vh;width:100%;display:flex;align-items:center;overflow:hidden"></div></div>
+<div id="v3ui">
+  <div id="xpline"><span id="xpinfo"></span> <progress id="xp" max="1" value="0"></progress></div>
+  <select id="mood"></select><button id="moodRnd">Random mood</button>
+  <button id="feed">Feed 🍎</button><button id="dance">Dance</button><button id="walk">Walk</button>
+  <label><input type="checkbox" id="glow"> Glow</label>
+  <input id="amount" type="number" min="1" value="500" aria-label="amount in rupees"><button id="send">Send ₹</button>
+  <div id="glowcfg"></div>
+</div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <!-- glow shading: darken the rim away from the light (top-left), like v3's radial gradients -->
+  <filter id="v-shade" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur in="SourceAlpha" stdDeviation="10"/><feOffset dx="-9" dy="-13" result="lit"/>
+    <feComposite in="SourceAlpha" in2="lit" operator="out" result="rim"/><feFlood id="v-shade-amt" flood-color="#000" flood-opacity=".3"/><feComposite in2="rim" operator="in" result="dark"/>
+    <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="dark"/></feMerge></filter>
+  <radialGradient id="v-gloss"><stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+</defs></svg>
+<svg id="fx"></svg>
+<script src="growth.js"></script>
+<script src="pets.js"></script>
+<script>
+// Tabby Cat's new-tab page rebuilt without React: same markup and class names, so its CSS drives every animation.
+// Pets, goodies and their placement come from pets.js (the extension's components, rendered once and saved).
+const T = window.TABBY, ICONS = {"bag": "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 53 57\"><path d=\"M41.0200882,19.2628937c-0.017395-3.9971924-0.9837646-9.9161987-4.2613525-14.1099854 c-2.5493164-3.262207-6.0966797-4.9863281-10.2587891-4.9863281c-4.1738281,0-7.7285156,1.7387695-10.2802734,5.0288086 c-3.2485962,4.1885381-4.208374,10.1835327-4.2262573,14.1690674L0.4915235,19.4046783l3.3200073,37.4310303h45.3779907 l3.3189697-37.6130371L41.0200882,19.2628937z M22.6688919,9.9390411c1.012207-1.2260742,2.1938477-1.7724609,3.8310547-1.7724609 c1.6484375,0,2.8354492,0.5493164,3.8496094,1.7802734c2.0596313,2.5014648,2.6561279,6.8780518,2.6860962,9.3439331 l-13.0667725,0.0457153C19.9942703,16.8578644,20.5958939,12.449234,22.6688919,9.9390411z\"></path></svg>", "shuffle": "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><path d=\"M95,72.8l-10.5-6.2l-10.1-6.2C73.8,60,73,60.5,73,61.3v5.4c-7-1.1-12.3-5.5-16.9-11.5 c-0.5,0.8-1.1,1.5-1.6,2.3c-1.7,2.6-3.4,5.3-5.4,8C55,72.4,62,77.8,73,78.8v7.2c0,0.8,0.8,1.2,1.4,0.9l10.3-6.2L95,74.5 C95.7,74.1,95.7,73.2,95,72.8z\"></path><path d=\"M12.5,19H9.1C7.9,19,7,19.9,7,21.1v7.8C7,30.1,7.9,31,9.1,31h3.4c9.8,0,15.9,5.7,21.7,13.7 c0-0.1,0.1-0.1,0.1-0.2c2.2-3.3,4.5-6.8,7-10.2C34.6,25.8,25.9,19,12.5,19z\"></path><path d=\"M95,25.4L84.2,19l-10.7-6.4c-0.7-0.4-1.6,0.1-1.6,0.9v7.8C55.7,23.2,47,36,39.4,47.7 C31.8,59.4,25.2,69,12.5,69H9.1C7.9,69,7,69.9,7,71.1v7.8C7,80.1,7.9,81,9.1,81h3.4c19.2,0,28.6-14,36.9-26.7 C56.1,44,62,35.3,72,33.4v5.8c0,0.8,0.9,1.3,1.6,0.9l10.5-6.4L95,27.2C95.7,26.8,95.7,25.8,95,25.4z\"></path></svg>", "house": "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 61 57\"><path d=\"M60.9744568,25.0246086L30.5041218,0.1654159L0.0318311,25.023571 l6.3676362,7.1027603l1.5725493,24.7082138h10.932312l-0.5641479-12.3484497 c0-6.7147217,5.4432373-12.1588745,12.1588745-12.1588745s12.1588726,5.4441528,12.1588726,12.1588745l-0.5197144,12.3484497 h10.895813l1.5645981-24.7002029L60.9744568,25.0246086z\" style=\"fill-rule: evenodd; clip-rule: evenodd;\"></path></svg>", "x": "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 60 60\"><polygon points=\"53.8842773,13.1870413 46.8129883,6.1157522 30,22.9287415 13.1870117,6.1157522 6.1157227,13.1870413 22.9287109,30.0000305 6.1157227,46.8130188 13.1870117,53.8843079 30,37.0713196 46.8129883,53.8843079 53.8842773,46.8130188 37.0712891,30.0000305 \t\"></polygon></svg>", "badge": "<svg class=\"badge\" version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 60 60\"><path d=\"M32.7194595,3.5239437l5.0332947-2.331665 c3.6968956-1.7125453,8.0376244,0.3781986,9.0040588,4.3359256l1.3151207,5.388845 c0.4509621,1.8463926,1.6912651,3.4017506,3.39077,4.2521811l4.9612274,2.4813013 c3.6433563,1.8230553,4.7154961,6.5200195,2.2232132,9.7433033l-3.3928223,4.3880901 c-1.1627502,1.5038757-1.6047821,3.4429283-1.2101059,5.3016739l1.1531372,5.4259148 c0.8463135,3.9858589-2.1573257,7.752079-6.2310524,7.813858l-5.546711,0.0830574 c-1.899929,0.02882-3.6920929,0.891613-4.8994484,2.3591156l-3.5232468,4.2844467 c-2.5876846,3.1470947-7.4054546,3.1470947-9.9931412,0l-3.5239277-4.2844467 c-1.2066746-1.4675026-2.9988365-2.3302956-4.8994484-2.3591156l-5.5460329-0.0830574 c-4.0744071-0.061779-7.0780487-3.8279991-6.2310443-7.813858l1.1531348-5.4259148 c0.3946743-1.8587456-0.0480471-3.7977982-1.2101045-5.3016739l-3.3935113-4.3880901 c-2.4922814-3.2232838-1.4201401-7.920248,2.2239027-9.7433033l4.9612255-2.4813013 c1.7001896-0.8504305,2.9398041-2.4057884,3.3900824-4.2521811l1.3158064-5.388845 c0.9664345-3.957727,5.3071661-6.048471,9.0040579-4.3359256l5.0332947,2.331665 C29.0060902,4.322907,30.9945583,4.322907,32.7194595,3.5239437\" style=\"fill-rule: evenodd; clip-rule: evenodd;\"></path></svg>"};
+const R = (a, b) => b === undefined ? Math.floor(Math.random()*(a + 1)) : a + Math.floor(Math.random()*(b - a + 1));   // lodash _.random: inclusive ints
+const pick = a => a && a.length ? a[R(a.length - 1)] : null;
+const typeOf = name => T.PETS.find(p => p.name === name);
+
+// ---------- pet generator (the extension's module 40) ----------
+const COLORS = { cat:['orange','white','gray','black','brown'], wildcat:['orange','white','gray','black','gold'], dog:['orange','white','gray','black','brown'],
+  classicdoggo:['orange','white','gray','black','brown','gold','orange-spot','gray-spot','black-spot','brown-spot','dark-brown-spot','gold-spot'],
+  penguin:['orange','black','gold','purple','blue','red'], bear:['orange','white','gray','black','brown','panda'], turtle:['green','blue','purple','yellow','red'],
+  chicken:['white','orange','black','brown'], seal:['white','black','gray','brown'], bunny:['white','gray','cream','gold','brown','black'], pig:['white','pink','pink','pink','black','brown','orange'] };
+const BG = ['light-blue','red','blue','light-purple','purple','green','teal','yellow','mauve'];
+const SPECIAL = ['Casper','Night','Pinky','Evil','Rainbow','Space','Tiny','Lil 404'];
+function genName(type){
+  const N = T.names, first = N.first.shared.concat(N.first[type] || []), last = N.last.shared.concat(N.last[type] || []);
+  const n = { first: pick(first), last: pick(last) }; n.full = n.first + ' ' + n.last;
+  const sp = SPECIAL.find(s => s === n.first || s === n.last || s === n.full); if (sp) n.special = sp.replace(/\s+/g, '-');   // special names reskin the page
+  return n;
+}
+const forPicker = type => ({ name: genName(type), color: pick(COLORS[type]), likesPets: Math.random() > .45 ? 'likes' : 'hates', body: R(0, 5), head: R(0, 1) });
+const forInit = type => ({ ...forPicker(type), bgColor: pick(BG) });
+
+// ---------- one pet on screen: markup + the action loops that toggle its classes ----------
+class Pet {
+  constructor(attrs, { disablePetting = false, displayName, motion = null } = {}){
+    this.a = attrs; this.motion = motion; this.mood = attrs.mood || null; this.def = T.types[attrs.petType.name]; this.disablePetting = disablePetting;
+    this.uni = { isBeingPet:false, likesPets: attrs.likesPets === 'likes', hatesPets: attrs.likesPets !== 'likes' };
+    this.state = { idle:{}, pet:{} }; this.last = {}; this.timers = []; this.stompSpeed = R(50, 300);
+    const compile = e => new Function('R', `return ${e}`).bind(this, R);
+    this.actions = {};
+    for (const g of ['idle', 'pet']) this.actions[g] = this.def.actions[g].map(x => ({ ...x, start: compile(x.start), stop: x.stop && compile(x.stop), t:{} }));
+    const wrap = document.createElement('div'); wrap.className = 'pet-wrapper';
+    const el = this.el = document.createElement('div'); wrap.append(el); this.root = wrap;
+    el.innerHTML = this.def.tpl[this.def.tplIndex[`${attrs.body}_${attrs.head}`] ?? 0];
+    el.querySelector('.pet-name').textContent = displayName || attrs.name.full;
+    const head = el.querySelector('.pet__head');
+    for (const slot of ['hat', 'glasses']) { const id = attrs[slot], at = id && this.def.pos[id];   // x,y = head marker - goody marker
+      if (at && head) head.insertAdjacentHTML('beforeend', `<svg class="v-goody-${slot}" x="${at[0]}" y="${at[1]}">${T.goodies[id]}</svg>`); }
+    const toy = el.querySelector('.pet-toy'); if (toy && attrs.toy) toy.innerHTML = T.toys[attrs.toy] || '';
+    // v3 layers: mood face + eyewear tilt with the head; bubbles, props and particles stay put in the toy layer
+    head?.insertAdjacentHTML('beforeend', '<g class="v-gloss"></g><g class="v-face"></g><g class="v-eyewear"></g>');
+    toy?.insertAdjacentHTML('beforeend', '<g class="v-extras"></g><g class="v-fx"></g>');
+    el.onmouseenter = () => this.startBeingPet(); el.onmouseleave = () => this.stopBeingPet();
+    this.paint(); this.loopAll('idle');
+  }
+  paint(){   // static classes + true universal flags + current actions (sleep shows alone)
+    const s = this.state, acts = this.uni.isBeingPet ? Object.values(s.pet) : s.idle.sleep ? [s.idle.sleep] : Object.values(s.idle);
+    const flags = Object.keys(this.uni).filter(k => this.uni[k]);
+    this.el.className = ['pet', this.a.petType.name, `fill--${this.def.type}--${this.a.color}`, ...flags, ...acts.filter(Boolean)].join(' ');
+  }
+  setAction(x, g){
+    let r;
+    if (x.toggleBetween) { const opts = x.actions.filter(a => a !== this.last[x.name]); r = pick(opts); this.last[x.name] = r; }
+    else if ((r = pick(x.actions)) === this.state[g][x.name]) r = undefined;
+    this.state[g][x.name] = r; this.paint(); this.loopAction(x, g);
+  }
+  loopAction(x, g){
+    const next = () => { clearTimeout(x.t.start); clearTimeout(x.t.stop); x.t.start = setTimeout(() => this.setAction(x, g), x.start()); };
+    if (x.stop) { clearTimeout(x.t.stop); x.t.stop = setTimeout(() => { this.state[g][x.name] = undefined; this.paint(); next(); }, x.stop()); }
+    else next();
+  }
+  loopAll(g){ this.actions[g].forEach(x => g === 'idle' ? this.loopAction(x, g) : this.setAction(x, g)); }
+  stopActions(g, keep){ this.actions[g].forEach(x => { clearTimeout(x.t.start); clearTimeout(x.t.stop); }); if (!keep) { this.state[g] = {}; this.paint(); } }
+  startBeingPet(){
+    if (this.disablePetting) return; clearTimeout(this.stopT);
+    if (this.uni.isBeingPet) return;
+    this.uni.isBeingPet = true; this.paint(); this.stopActions('idle'); if (this.uni.likesPets) this.loopAll('pet');
+    if (this.uni.likesPets && this.motion) this.hearts = setInterval(() => petted(this), 250);   // v3: hearts + xp while it's being pet
+  }
+  stopBeingPet(){
+    if (this.disablePetting) return;
+    this.stopT = setTimeout(() => { this.uni.isBeingPet = false; this.paint(); this.stopActions('pet'); this.loopAll('idle'); clearInterval(this.hearts); }, 300);
+  }
+  destroy(){ this.stopActions('pet', true); this.stopActions('idle', true); clearTimeout(this.stopT); clearInterval(this.hearts); live.delete(this); this.root.remove(); }
+  // ---- v3: needs layout, so call once the pet is in the page ----
+  attach(parent, before){
+    parent.insertBefore(this.root, before || null); live.add(this);
+    this.A = anchorsOf(this); this.setMood(this.mood); drawGloss(this);
+  }
+  setMood(m){
+    this.mood = m || null; const E = EMO[this.mood], A = this.A, q = s => this.el.querySelector(s);
+    q('.v-face').innerHTML = E ? emoFace(E, A) : '';
+    q('.v-extras').innerHTML = E ? emoExtras(E, A, !!this.a.hat) : '';
+    const g3 = E?.eyes && this.def.pos[E.eyes];   // a mood can swap in its own eyewear (3D glasses for entertainment)
+    q('.v-eyewear').innerHTML = g3 ? `<svg x="${g3[0]}" y="${g3[1]}">${T.goodies[E.eyes]}</svg>` : '';
+    const own = q('.v-goody-glasses'); if (own) own.style.display = g3 ? 'none' : '';
+  }
+}
+
+// ---------- saved state (same shape as the extension; every pet counts as collected, nothing to buy) ----------
+const KEY = 'tabbyV5';
+const load = () => { try { return JSON.parse(localStorage[KEY]); } catch { return null; } };
+const S = Object.assign({ visits:0, activePet:{ shuffle:true, active:{ petType:T.PETS[0] } }, activeGoodies:{ shuffle:true, active:{} }, collectedGoodies:{ newItems:[], list:[] } }, load() || {});
+const save = () => { try { localStorage[KEY] = JSON.stringify(S); } catch {} };
+const collectedTypes = () => T.PETS;
+const goodyPick = type => { const ids = S.collectedGoodies.list.filter(id => T.GOODIES[id].type === type); return ids.length ? ids[R(2*ids.length)] ?? null : null; };   // about half the time: none
+const shuffleGoodies = () => ({ glasses: goodyPick('glasses'), hat: goodyPick('hat'), toy: goodyPick('toy') });
+
+// a new tab: count the visit, pick the pet, maybe find a goody, shuffle what it wears
+S.visits++;
+if (S.activePet.shuffle || !typeOf(S.activePet.active.petType?.name)) S.activePet.active.petType = pick(collectedTypes());
+S.activePet.active = { ...S.activePet.active, ...forInit(S.activePet.active.petType.type) };
+if (S.visits === 1 || S.visits % 200 === 0 || Math.random() < .005) {   // the extension's drip: first tab, every 200th, or 0.5% luck
+  const types = collectedTypes().map(p => p.type);
+  const g = pick(Object.values(T.GOODIES).filter(g => (g.forPetType === undefined || types.includes(g.forPetType)) && !S.collectedGoodies.list.includes(g.id)));
+  if (g) { S.collectedGoodies.list.push(g.id); S.collectedGoodies.newItems.push(g.id); S.activeGoodies.active[g.type] = g.id; }
+}
+if (S.activeGoodies.shuffle) S.activeGoodies.active = shuffleGoodies();
+save();
+
+// =================== v3 features: moods, motion, growth, glow, send money ===================
+const NS = 'http://www.w3.org/2000/svg', TAU = Math.PI*2, clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const K = 2.4;      // v3 art is drawn for ~100-unit critters; Tabby pets are ~240 units tall in their 480 box
+const PX = 2.2;     // v3 motion units -> screen px
+const live = new Set();
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const until = (ok, ms = 60) => new Promise(r => { const t = setInterval(() => { if (ok()) { clearInterval(t); r(); } }, ms); });
+
+// ---------- anchors, measured on the real pet: eye ellipses, plus the extension's own hat/glasses targets ----------
+function goodyTarget(pet, slot){   // head marker = goody offset + the goody's own marker circle
+  const id = Object.keys(pet.def.pos).find(k => k.startsWith(slot + '-')); if (!id) return null;
+  const m = /<circle(?![^>]*\sr=)[^>]*?cx="([-\d.]+)"[^>]*?cy="([-\d.]+)"/.exec(T.goodies[id]);
+  return m ? [pet.def.pos[id][0] + +m[1], pet.def.pos[id][1] + +m[2]] : null;
+}
+function anchorsOf(pet){
+  const eyes = [...pet.el.querySelectorAll('.pet__head .eyes > *')].map(e => { const b = e.getBBox(); return [b.x + b.width/2, b.y + b.height/2, Math.max(b.width, b.height)/2]; }).filter(e => e[2] > 0);
+  const gt = goodyTarget(pet, 'glasses') || [240, 200], avg = k => eyes.reduce((s, e) => s + e[k], 0)/eyes.length;
+  const ec = eyes.length ? [avg(0), avg(1)] : gt, xs = eyes.map(e => e[0]);
+  const span = eyes.length > 1 ? Math.max(...xs) - Math.min(...xs) : 50, eyeR = eyes.length ? avg(2) : 7;
+  const hat = goodyTarget(pet, 'hat') || [ec[0], ec[1] - 90];
+  return { eyes: eyes.length ? eyes.map(e => [e[0], e[1]]) : [[ec[0] - 25, ec[1]], [ec[0] + 25, ec[1]]], eye:ec, eyeR, span,
+    headW: span*2.4, mouthW: span*.5, mouthC: [ec[0], ec[1] + span*.62], hatAt: hat, topY: Math.min(hat[1], ec[1] - span) };
+}
+
+// ---------- moods (v3): a face, idle body language, floating particles and a bubble / cloud / prop ----------
+const EMOTIONS = ['happy','sad','food','entertainment','travel','shopping','empty_wallet'];
+const EMO = {
+  happy:         { mouth:'grin',  cheeks:true, motion:{ jump:7, freq:1.8, sway:3, squash:.08 }, fx:{ every:500, glyphs:['✦','♥','✦'], colors:['#f6c945','#f2679b','#ffb800'] } },
+  sad:           { mouth:'frown', brows:true, tear:true, cloud:true, motion:{ slump:.07, lean:-3, freq:.5, sway:1.5 }, fx:{ every:160, rain:true } },
+  food:          { mouth:'chew',  bubble:'burger', motion:{ jump:1.5, freq:1.4, sway:2, squash:.03 }, fx:{ every:900, glyphs:['nom','yum'], colors:['#c9714e','#e8494b'] } },
+  entertainment: { mouth:'grin',  bubble:'popcorn', eyes:'glasses-ThreeD', motion:{ jump:6, freq:1.1, sway:11, squash:.06 }, fx:{ every:420, glyphs:['♪','♫'], colors:['#3a85f2','#e8494b','#16b79d','#8c6fd6'] } },
+  travel:        { mouth:'smile', bubble:'plane', ground:'suitcase', motion:{ jump:3, freq:1.3, sway:4, lean:3, squash:.03 }, fx:{ every:1400, glyphs:['✈'], colors:['#3a85f2'] } },
+  shopping:      { mouth:'open',  bubble:'bag', ground:'bags', motion:{ jump:5, freq:2.2, sway:2, squash:.06 }, fx:{ every:520, glyphs:['$','%','$'], colors:['#2f9e44','#e8494b','#e0a800'] } },
+  empty_wallet:  { mouth:'frown', brows:true, tear:true, wallet:true, bubble:'zero', motion:{ slump:.09, lean:-2, freq:.45, sway:1.2, squash:.05 }, fx:{ every:1400, wallet:true, glyphs:['₹0'], colors:['#9a9184'] } },
+};
+const INK = '#2b2a33';
+const ICONS3 = {   // ~24 units, centred on 0,0
+  zero:    `<text y="6" font-size="16" font-weight="800" text-anchor="middle" fill="#e8494b">₹0</text>`,
+  burger:  `<path d="M-11 -1 Q-11 -11 0 -11 Q11 -11 11 -1Z" fill="#f0a64a"/><circle cx="-4" cy="-7" r=".9" fill="#fff4d6"/><circle cx="3" cy="-8" r=".9" fill="#fff4d6"/><rect x="-12" y="-1" width="24" height="3" rx="1.5" fill="#7cc23c"/><rect x="-11" y="2" width="22" height="4" rx="2" fill="#8a4b2f"/><path d="M-11 6 H11 Q11 10 0 10 Q-11 10 -11 6Z" fill="#f0a64a"/>`,
+  popcorn: `<circle cx="-5" cy="-5" r="4" fill="#fff1b8"/><circle cx="1" cy="-7" r="4.4" fill="#fffbe6"/><circle cx="6" cy="-4" r="3.8" fill="#fff1b8"/><path d="M-9 -2 L9 -2 L6 12 L-6 12Z" fill="#fff"/><path d="M-5 -2 L-4 12 M0 -2 V12 M5 -2 L4 12" stroke="#e8494b" stroke-width="2.4"/>`,
+  plane:   `<path d="M-12 3 L11 -3 Q15 -4 14 -1 L-9 6Z" fill="#3a85f2"/><path d="M-1 1 L-7 -9 L-3 -9 L5 -1Z" fill="#2f6fd0"/><path d="M-9 4 L-13 -2 L-11 -2 L-6 3Z" fill="#2f6fd0"/>`,
+  bag:     `<path d="M-9 -4 H9 L10 11 H-10Z" fill="#f2679b"/><path d="M-5 -4 Q-5 -11 0 -11 Q5 -11 5 -4" stroke="#c94d7f" stroke-width="2" fill="none"/>`,
+};
+const GROUND_ITEMS = {   // stand on the ground, drawn leftwards from (0,0)
+  suitcase: `<rect x="-32" y="-24" width="32" height="22" rx="4" fill="#c9714e"/><path d="M-21 -24 V-29 H-11 V-24" stroke="#8a4b2f" stroke-width="2.5" fill="none"/><path d="M-32 -14 H0" stroke="#8a4b2f" stroke-width="2"/><rect x="-14" y="-21" width="8" height="5" rx="1" fill="#f6c945"/><circle cx="-27" cy="-1" r="2.5" fill="#555"/><circle cx="-5" cy="-1" r="2.5" fill="#555"/>`,
+  bags:     `<path d="M-38 -24 H-20 L-18 0 H-40Z" fill="#3a85f2"/><path d="M-34 -24 Q-34 -32 -29 -32 Q-24 -32 -24 -24" stroke="#2f6fd0" stroke-width="2" fill="none"/><path d="M-22 -18 H-2 L0 0 H-24Z" fill="#f2679b"/><path d="M-17 -18 Q-17 -26 -12 -26 Q-7 -26 -7 -18" stroke="#c94d7f" stroke-width="2" fill="none"/><text x="-12" y="-6" font-size="9" font-weight="800" text-anchor="middle" fill="#fff">%</text>`,
+};
+// open wallet held upside down (opening towards the ground), ~36 wide, centred on 0,0
+const WALLET = `<g transform="rotate(168)"><path d="M-18 0 L-16 -15 Q0 -20 16 -15 L18 0Z" fill="#8a5a3a"/><path d="M-18 0 H18 L16 15 Q0 19 -16 15Z" fill="#a8703f"/>
+  <path d="M-13 0 H13" stroke="#5e3a22" stroke-width="1.6" stroke-linecap="round"/><path d="M-12 -10 H12 L11 -4 H-11Z" fill="#c99a6b"/><rect x="9" y="4" width="8" height="6" rx="2" fill="#f6c945"/></g>`;
+function emoMouth(kind, A){
+  const w = clamp(A.mouthW*1.1, 9, Math.max(14, A.headW*.42)), [x, y] = A.mouthC, sw = Math.max(2, w*.13).toFixed(1), h = w/2;
+  const at = inner => `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})">${inner}</g>`;
+  return at({
+    grin:  `<path d="M${-h} ${-w*.1} Q0 ${w*.75} ${h} ${-w*.1}Z" fill="${INK}"/><path d="M${-h*.6} ${-w*.02} H${h*.6}" stroke="#fff" stroke-width="${(w*.1).toFixed(1)}" stroke-linecap="round"/><ellipse cx="0" cy="${w*.3}" rx="${w*.2}" ry="${w*.1}" fill="#f0788e"/>`,
+    smile: `<path d="M${-h*.8} 0 Q0 ${w*.5} ${h*.8} 0" stroke="${INK}" stroke-width="${sw}" stroke-linecap="round" fill="none"/>`,
+    frown: `<path d="M${-h*.75} ${w*.22} Q0 ${-w*.2} ${h*.75} ${w*.22}" stroke="${INK}" stroke-width="${sw}" stroke-linecap="round" fill="none"/>`,
+    open:  `<ellipse cx="0" cy="${w*.08}" rx="${w*.3}" ry="${w*.36}" fill="${INK}"/><ellipse cx="0" cy="${w*.28}" rx="${w*.18}" ry="${w*.1}" fill="#f0788e"/>`,
+    chew:  `<ellipse class="chew" cx="0" cy="0" rx="${w*.34}" ry="${w*.24}" fill="${INK}"/>`,
+  }[kind]);
+}
+function emoFace(e, A){
+  const r = A.eyeR, out = [emoMouth(e.mouth, A)];
+  if (e.brows) for (const [x, y] of A.eyes) { const s = x >= A.eye[0] ? 1 : -1;     // worried brows: inner ends raised
+    out.push(`<path d="M${(x + s*r*1.6).toFixed(1)} ${(y - r*2).toFixed(1)} L${(x - s*r*1.2).toFixed(1)} ${(y - r*3.2).toFixed(1)}" stroke="${INK}" stroke-width="${Math.max(1.8, r*.7).toFixed(1)}" stroke-linecap="round"/>`); }
+  if (e.tear) { const [x, y] = A.eyes[A.eyes.length - 1];
+    out.push(`<path class="tear" d="M${x} ${y + r*1.4} q${-r*.9} ${r*1.6} 0 ${r*2.2} q${r*.9} ${-r*.6} 0 ${-r*2.2}Z" fill="#6cc4ff"/>`); }
+  if (e.cheeks) for (const [x, y] of A.eyes) out.push(`<ellipse cx="${(x + (x - A.eye[0])*.25).toFixed(1)}" cy="${(y + r*2.3).toFixed(1)}" rx="${(r*1.5).toFixed(1)}" ry="${(r*.85).toFixed(1)}" fill="#ff7fa5" opacity=".45"/>`);
+  return out.join('');
+}
+// where the bubble / cloud / wallet / particles sit, in the pet's 480 box (clears the hat if one is worn)
+const emoSpots = (A, hat) => { const lift = hat ? 70 : 0;
+  return { bubble:[A.eye[0] + A.span*1.4 + 70, Math.min(A.topY - 20, 150)], cloud:[A.eye[0], A.topY - 70 - lift], top:[A.eye[0], A.topY - 25 - lift], wallet:[A.eye[0] + A.span*2.3, A.eye[1] + 120], ground:[A.eye[0] - A.span*1.5, 364] }; };
+const big = ([x, y], inner) => `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${K})">${inner}</g>`;
+function emoExtras(e, A, hat){
+  const sp = emoSpots(A, hat), out = [];
+  if (e.bubble) out.push(big(sp.bubble, `<circle cx="-14" cy="20" r="2.5" fill="#fff" stroke="#d7d3cc" stroke-width="1.5"/><circle cx="-8" cy="13" r="3.5" fill="#fff" stroke="#d7d3cc" stroke-width="1.5"/><circle r="17" fill="#fff" stroke="#d7d3cc" stroke-width="2"/>${ICONS3[e.bubble]}`));
+  if (e.cloud) out.push(big(sp.cloud, `<circle cx="-10" cy="2" r="8" fill="#9aa3ad"/><circle cx="0" cy="-3" r="10" fill="#9aa3ad"/><circle cx="11" cy="2" r="8" fill="#9aa3ad"/><rect x="-18" y="2" width="37" height="8" rx="4" fill="#9aa3ad"/>`));
+  if (e.ground) out.push(big(sp.ground, GROUND_ITEMS[e.ground]));
+  if (e.wallet) out.push(big(sp.wallet, `<g class="shake">${WALLET}</g>`));
+  return out.join('');
+}
+// particles: sparkles, notes, $ tags, rain from the cloud, moths and dust from the empty wallet
+const svgEl = (tag, attrs, parent, ms) => { const el = document.createElementNS(NS, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); parent.append(el); if (ms) setTimeout(() => el.remove(), ms); return el; };
+setInterval(() => {
+  for (const p of live) {
+    const e = EMO[p.mood], fx = p.el.querySelector('.v-fx'); if (!e || !fx) continue;
+    p.clock = (p.clock || 0) + 100; if (p.clock < e.fx.every) continue; p.clock = 0;
+    const sp = emoSpots(p.A, !!p.a.hat);
+    if (e.fx.rain) { const x = sp.cloud[0] + (Math.random()*60 - 30), y = sp.cloud[1] + 26; svgEl('line', { class:'rain', x1:x, x2:x, y1:y, y2:y + 14 }, fx, 700); continue; }
+    if (e.fx.wallet) {
+      const [wx, wy] = [sp.wallet[0], sp.wallet[1] + 24];
+      for (let d = 0; d < 3; d++) { const c = svgEl('circle', { class:'dust', cx:wx + Math.random()*36 - 18, cy:wy, r:2.5 + Math.random()*3.5 }, fx, 2000); c.style.animationDelay = (.9 + d*.08) + 's'; c.style.opacity = 0; }
+      if (Math.random() < .65) { const m = svgEl('g', { transform:`translate(${wx} ${wy - 8}) scale(${K})` }, fx, 3400);
+        m.innerHTML = `<g class="moth" style="--dx:${(Math.random()*36 - 18).toFixed(0)}px; animation-delay:.9s; opacity:0"><g class="flap"><ellipse cx="-4.5" cy="0" rx="5" ry="3.6" fill="#cfc8bc"/><ellipse cx="4.5" cy="0" rx="5" ry="3.6" fill="#cfc8bc"/></g><ellipse rx="1.6" ry="3.4" fill="#8d877d"/></g>`; continue; }
+    }
+    const k = R(e.fx.glyphs.length - 1), t = svgEl('text', { class:'emo', fill:e.fx.colors[k % e.fx.colors.length], x:sp.top[0] + (Math.random() - .5)*p.A.span*3, y:sp.top[1] }, fx, 1600);
+    t.textContent = e.fx.glyphs[k]; t.style.setProperty('--dx', (Math.random()*70 - 35) + 'px');
+  }
+}, 100);
+
+// ---------- whole-body motion (v3 pose): breathing, mood body language, walk / dance gaits, hops, catches ----------
+const GAITS = { waddle:{ freq:1.6, speed:42, jump:3, sway:9, lean:0, squash:.03 }, dance:{ freq:1.2, speed:0, jump:10, sway:13, lean:0, squash:.08 } };
+const newMotion = () => ({ x:0, dir:1, face:1, mode:'idle', ph:Math.random(), k:0, hop:0, catch:0, eph:0, tx:0, tgt:null });
+function pose(p, dt, t){
+  const a = p.motion, m = a.mode, moving = m !== 'idle', g = m === 'dance' ? GAITS.dance : GAITS.waddle;
+  a.k += ((moving ? 1 : 0) - a.k)*Math.min(1, dt*8); const k = a.k;
+  if (moving) a.ph += dt*g.freq;
+  const step = Math.abs(Math.sin(TAU*a.ph));
+  let by = 0, lean = 0, sx = 1, sy = 1;
+  const br = Math.sin(TAU*t/3); sy += .02*br; sx -= .01*br;
+  by -= g.jump*k*step;
+  const land = Math.pow(1 - step, 6)*k;
+  sy *= 1 - g.squash*land + g.squash*.5*k*step; sx *= 1 + g.squash*land*.8;
+  lean = g.sway*k*Math.sin(TAU*a.ph);
+  const em = EMO[p.mood]?.motion;
+  if (em) { const q = 1 - k; a.eph += dt*(em.freq || 1); const st = Math.abs(Math.sin(TAU*a.eph)), l2 = Math.pow(1 - st, 6)*q*(em.squash || 0);
+    by -= (em.jump || 0)*q*st; lean += (em.sway || 0)*q*Math.sin(TAU*a.eph) + (em.lean || 0)*q;
+    sy *= 1 - l2 + (em.squash || 0)*.5*q*st; sx *= 1 + l2*.8;
+    if (em.slump) { sy *= 1 - em.slump*q; sx *= 1 + em.slump*.6*q; } }
+  if (a.hop > 0) { const pp = 1 - a.hop/.6, air = Math.sin(Math.PI*pp); by -= 26*air; sy *= 1 + .08*air; sx *= 1 - .05*air; a.hop -= dt; }
+  if (a.catch > 0) { const c = a.catch/.22; sy *= 1 - .12*c; sx *= 1 + .09*c; a.catch -= dt; }
+  return { by, lean: lean + a.tx, sx, sy };
+}
+const hop = p => { if (p) p.motion.hop = .6; };
+let lastT = performance.now();
+(function tick(now){
+  const dt = Math.min((now - lastT)/1000, .1), t = now/1000; lastT = now;
+  for (const p of live) {
+    const a = p.motion; if (!a) continue;
+    const sp = GAITS.waddle.speed*PX*growth(p).scale, edge = innerWidth/2 - 160;
+    if (a.mode === 'walk') { a.x += a.dir*sp*dt; if (a.x > edge) { a.x = edge; a.dir = -1; } if (a.x < -edge) { a.x = -edge; a.dir = 1; } a.face = -a.dir; addXp(p, 'walk', dt); }
+    else if (a.mode === 'home') { const T0 = a.tgt ?? 0, d = T0 - a.x, s2 = a.tgt != null ? sp*2 : sp; a.dir = Math.sign(d) || 1; a.face = -a.dir;
+      if (Math.abs(d) < s2*dt) { a.x = T0; a.mode = 'idle'; a.face = a.faceAfter ?? 1; } else a.x += a.dir*s2*dt; }
+    if (a.mode === 'dance') addXp(p, 'dance', dt);
+    const P = pose(p, dt, t), sc = growth(p).scale;   // the art faces left: face = 1 as drawn, -1 mirrored
+    p.root.style.translate = `${a.x.toFixed(1)}px ${(P.by*PX).toFixed(1)}px`;
+    p.root.style.scale = `${(sc*a.face).toFixed(3)} ${sc.toFixed(3)}`;
+    p.el.style.rotate = `${(P.lean*a.face).toFixed(2)}deg`; p.el.style.scale = `${P.sx.toFixed(3)} ${P.sy.toFixed(3)}`;
+    const nm = p.el.querySelector('.pet-name'); if (nm) nm.style.scale = `${a.face} 1`;   // keep the name readable when mirrored
+  }
+  requestAnimationFrame(tick);
+})(lastT);
+setInterval(() => { if (pet && pet.motion.mode === 'idle' && !xfer && !['sad','empty_wallet'].includes(pet.mood) && Math.random() < .35) hop(pet); }, 2500);
+
+// ---------- growth: xp -> level -> size (growth.js); every level-up finds a goody ----------
+// ponytail: Tabby pets have one form each, so there's no evolution chain; levels grow the pet and drip goodies instead
+const FORMS = [{ at:1, size:[.85, 1.15] }];
+S.xp = S.xp || {};
+const growth = p => Growth.traits(S.xp[p.a.petType.name] || 0, FORMS);
+function float(p, text, color, dy = 0, ms = 2200){
+  const r = p.el.querySelector('.pet__head')?.getBoundingClientRect() || p.root.getBoundingClientRect();
+  const d = document.createElement('div'); d.className = 'v-float'; d.textContent = text; d.style.color = color;
+  d.style.left = (r.left + r.width/2) + 'px'; d.style.top = (r.top + r.height*.12 + dy) + 'px'; d.style.animationDuration = ms + 'ms';
+  document.body.append(d); setTimeout(() => d.remove(), ms);
+}
+function burst(x, y, glyphs, n = 12){
+  const fx = document.getElementById('fx');
+  for (let k = 0; k < n; k++) { const ang = k/n*TAU, t = svgEl('text', { class:'spark', x, y, 'text-anchor':'middle' }, fx, 1200);
+    t.textContent = glyphs[k % glyphs.length]; t.style.setProperty('--dx', Math.cos(ang)*150 + 'px'); t.style.setProperty('--dy', Math.sin(ang)*150 + 'px'); }
+}
+const centerOf = (p, sel = '.pet__body') => { const r = (p.el.querySelector(sel) || p.el).getBoundingClientRect(); return [r.left + r.width/2, r.top + r.height/2, r]; };
+function addXp(p, event, amount = 1){
+  if (p !== pet) return;   // only your own pet levels up (the send-money friend is a visitor)
+  const name = p.a.petType.name, r = Growth.gain(S.xp[name] || 0, event, amount);
+  S.xp[name] = r.xp;
+  if (r.leveledUp) {
+    float(p, `LEVEL ${growth(p).level}!`, '#e8494b'); const [x, y] = centerOf(p); burst(x, y, ['✦']);
+    const types = collectedTypes().map(q => q.type);
+    const g = pick(Object.values(T.GOODIES).filter(g => (g.forPetType === undefined || types.includes(g.forPetType)) && !S.collectedGoodies.list.includes(g.id)));
+    if (g) { S.collectedGoodies.list.push(g.id); S.collectedGoodies.newItems.push(g.id); float(p, `found a ${g.name.replace(/([a-z])([A-Z])/g, '$1 $2')}!`, '#2f9e44', 34); renderControls(); }
+    save();
+  }
+  xpUI();
+}
+function petted(p){
+  addXp(p, 'pet');
+  const fx = p.el.querySelector('.v-fx'); if (!fx) return;
+  const t = svgEl('text', { class:'heart', x:p.A.eye[0] + (Math.random() - .5)*p.A.span*3, y:p.A.topY + 40 + Math.random()*40, 'text-anchor':'middle' }, fx, 1000); t.textContent = '❤';
+}
+function xpUI(){
+  if (!pet) return; const t = growth(pet);
+  document.getElementById('xpinfo').textContent = `${pet.a.name.full} · Lv ${t.level} · ${Math.floor(t.xp)}/${t.nextLevelXp} xp · size ×${t.scale.toFixed(2)}`;
+  document.getElementById('xp').value = t.levelFrac;
+}
+setInterval(save, 3000);
+
+// ---------- glow look (v3 knobs; shading is an inner rim filter here since the art is flat class-coloured paths) ----------
+const GLOW_KNOBS = { halo:[.35,0,1], blur:[.8,0,3], brightness:[1,1,2], shading:[1.5,0,1.5], gloss:[.45,0,1.5], shadow:[1.5,0,1.5] };   // [default, min, max]
+S.glowCfg = Object.assign(Object.fromEntries(Object.entries(GLOW_KNOBS).map(([k,[d]]) => [k, d])), { color:'' }, S.glowCfg || {});
+function applyGlow(){
+  const g = S.glowCfg, b = document.body.style, rgb = g.color ? [1,3,5].map(k => parseInt(g.color.slice(k, k + 2), 16)) : [255, 236, 200];
+  document.body.classList.toggle('glow', !!S.glow);
+  b.setProperty('--g-bright', g.brightness); b.setProperty('--g-blur', (6 + 14*g.blur).toFixed(1) + 'px');
+  b.setProperty('--g-halo', `rgba(${rgb.join(',')},${g.halo})`); b.setProperty('--g-shadow', Math.min(1, .5*g.shadow));
+  document.getElementById('v-shade-amt').setAttribute('flood-opacity', (.22*g.shading).toFixed(3));
+  for (const p of live) drawGloss(p);
+}
+function drawGloss(p){   // soft highlight on the upper-left of the head, clipped to the head shape
+  const box = p.el.querySelector('.v-gloss'), head = p.el.querySelector('.pet__head path.fill'); if (!box) return;
+  box.innerHTML = ''; if (!S.glow || !head || !(S.glowCfg.gloss > 0)) return;
+  const id = 'vh' + (p.uid ??= Math.random().toString(36).slice(2, 8)); head.id = id;
+  const A = p.A, cx = A.eye[0] - A.span*.6, cy = A.eye[1] - A.span*.85;
+  box.innerHTML = `<clipPath id="c${id}"><use href="#${id}"/></clipPath><ellipse clip-path="url(#c${id})" cx="${cx}" cy="${cy}" rx="${A.span*.8}" ry="${A.span*.5}" transform="rotate(-22 ${cx} ${cy})" fill="url(#v-gloss)" opacity="${Math.min(1, .6*S.glowCfg.gloss)}"/>`;
+}
+function glowUI(){
+  const box = document.getElementById('glowcfg'), g = S.glowCfg;
+  box.innerHTML = Object.entries(GLOW_KNOBS).map(([k,[d,lo,hi]]) =>
+      `<label>${k} <input type="range" data-k="${k}" min="${lo}" max="${hi}" step=".05" value="${g[k]}"><span>${(+g[k]).toFixed(2)}</span></label>`).join('')
+    + `<label><input type="checkbox" id="tint" ${g.color ? 'checked' : ''}> tint <input type="color" id="tintc" value="${g.color || '#ffb347'}"></label><button id="glowreset">reset</button>`;
+  box.querySelectorAll('input[type=range]').forEach(el => el.oninput = () => { g[el.dataset.k] = +el.value; el.nextElementSibling.textContent = (+el.value).toFixed(2); applyGlow(); save(); });
+  const tint = box.querySelector('#tint'), tintc = box.querySelector('#tintc');
+  tint.onchange = tintc.oninput = () => { g.color = tint.checked ? tintc.value : ''; applyGlow(); save(); };
+  box.querySelector('#glowreset').onclick = () => { for (const [k,[d]] of Object.entries(GLOW_KNOBS)) g[k] = d; g.color = ''; applyGlow(); save(); glowUI(); };
+}
+
+// ---------- send money (v3): a friend walks in, notes flip across like the XP copy dialog, both end up happy ----------
+const NOTE_FRONT = `<rect x="-16" y="-9" width="32" height="18" rx="2.5" fill="#8fd18a" stroke="#4e9a49" stroke-width="1.5"/><rect x="-12.5" y="-5.5" width="25" height="11" rx="1.5" fill="none" stroke="#4e9a49" stroke-width="1" opacity=".6"/><circle r="4.2" fill="#c8ecc4" stroke="#4e9a49" stroke-width="1.2"/><text y="2.6" font-size="7" font-weight="800" text-anchor="middle" fill="#2f6b2b">₹</text>`;
+const NOTE_BACK  = `<rect x="-16" y="-9" width="32" height="18" rx="2.5" fill="#6fb469" stroke="#3f8a3a" stroke-width="1.5"/><path d="M-11 -3 H11 M-11 1 H11 M-11 5 H4" stroke="#3f8a3a" stroke-width="1" opacity=".55"/>`;
+function fly(a, b, onLand){   // same arc and pace for every note, flipping end over end (scaleY = cos(turn); the back shows while it's negative)
+  const el = svgEl('g', {}, document.getElementById('fx'));
+  el.innerHTML = `<g class="front">${NOTE_FRONT}</g><g class="back" style="display:none">${NOTE_BACK}</g>`;
+  const front = el.querySelector('.front'), back = el.querySelector('.back');
+  const t0 = performance.now(), dur = 1150, h = 120, turns = 1.5, dir = Math.sign(b[0] - a[0]) || 1, z = 2.2;
+  (function step(now){
+    const u = Math.min(1, (now - t0)/dur), x = a[0] + (b[0] - a[0])*u, y = a[1] + (b[1] - a[1])*u - h*4*u*(1 - u);
+    const flip = Math.cos(TAU*turns*u); front.style.display = flip < 0 ? 'none' : ''; back.style.display = flip < 0 ? '' : 'none';
+    const tilt = dir*(-25 + 50*u), skew = 12*Math.sin(TAU*turns*u), lift = z*(1 + .18*Math.sin(Math.PI*u));
+    el.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${tilt.toFixed(1)}) skewX(${skew.toFixed(1)}) scale(${lift.toFixed(3)} ${(lift*Math.max(.08, Math.abs(flip))).toFixed(3)})`);
+    if (u < 1) requestAnimationFrame(step); else { el.remove(); onLand(); }
+  })(t0);
+}
+let xfer = null;
+async function sendMoney(amount){
+  if (xfer || !pet) return;
+  const me = pet, t = pick(T.PETS.filter(q => q.name !== me.a.petType.name)), money = '₹' + amount.toLocaleString('en-IN');
+  const fr = xfer = new Pet({ petType:t, ...forPicker(t.type) }, { motion:newMotion() });
+  fr.root.classList.add('v-friend'); Object.assign(fr.root.style, { left:me.root.offsetLeft + 'px', top:me.root.offsetTop + 'px', width:me.root.offsetWidth + 'px' });
+  fr.attach(app); fr.motion.x = innerWidth/2 + 260;
+  // 1. walk to the meeting spots and face each other
+  const gap = Math.min(270, innerWidth*.22);
+  Object.assign(me.motion, { mode:'home', tgt:-gap, faceAfter:-1 }); Object.assign(fr.motion, { mode:'home', tgt:gap, faceAfter:1 });
+  await until(() => me.motion.mode === 'idle' && fr.motion.mode === 'idle');
+  // 2. wind up: lean back, show the amount, throw
+  float(me, '-' + money, '#e8494b', -20, 1900);
+  me.motion.tx = 9; await sleep(380); me.motion.tx = -7; hop(me); await sleep(160); me.motion.tx = 0;
+  // 3. the stream; every catch squashes the receiver
+  const n = clamp(Math.round(Math.log10(amount + 1)*3), 5, 16); let landed = 0;
+  for (let k = 0; k < n; k++) {
+    const [ax, ay, ar] = centerOf(me), [bx, by, br] = centerOf(fr);
+    fly([ax + ar.width*.3, ay - ar.height*.1], [bx - br.width*.1, by - br.height*.05], () => { landed++; fr.motion.catch = .22; if (landed === n) burst(bx, by, ['✦','₹','✦']); });
+    await sleep(190);
+  }
+  await until(() => landed === n);
+  // 4. both happy, the receiver hops
+  me.setMood('happy'); fr.setMood('happy'); hop(fr); float(fr, '+' + money, '#2f9e44', -20, 2400);
+  await sleep(2400);
+  // 5. the friend heads off, your pet goes back to its own mood and spot
+  Object.assign(fr.motion, { mode:'home', tgt:innerWidth/2 + 300 }); fr.setMood(null);
+  Object.assign(me.motion, { mode:'home', tgt:null, faceAfter:1 }); me.setMood(S.mood);
+  await until(() => fr.motion.mode === 'idle'); fr.destroy(); xfer = null;
+}
+
+// ---------- toolbar ----------
+{
+  const mood = document.getElementById('mood');
+  mood.innerHTML = '<option value="">mood: none</option>' + EMOTIONS.map(m => `<option value="${m}">mood: ${m.replace('_', ' ')}</option>`).join('');
+  const setMood = m => { S.mood = m || null; mood.value = S.mood || ''; pet?.setMood(S.mood); save(); };
+  mood.value = S.mood || ''; mood.onchange = () => setMood(mood.value);
+  document.getElementById('moodRnd').onclick = () => setMood(pick(EMOTIONS));
+  document.getElementById('feed').onclick = () => { float(pet, '🍎', '#e8494b'); hop(pet); addXp(pet, 'feed'); };
+  const toggleMode = (m, btn) => () => { if (xfer) return; const a = pet.motion; a.mode = a.mode === m ? (m === 'walk' ? 'home' : 'idle') : m; a.tgt = null; a.faceAfter = 1; if (a.mode !== 'walk') a.face = 1;
+    document.getElementById('dance').textContent = a.mode === 'dance' ? 'Stop dancing' : 'Dance'; document.getElementById('walk').textContent = a.mode === 'walk' ? 'Stop walking' : 'Walk'; };
+  document.getElementById('dance').onclick = toggleMode('dance'); document.getElementById('walk').onclick = toggleMode('walk');
+  const glowBox = document.getElementById('glow'); glowBox.checked = !!S.glow;
+  glowBox.onchange = () => { S.glow = glowBox.checked; applyGlow(); save(); };
+  document.getElementById('send').onclick = () => sendMoney(Math.max(1, Math.round(+document.getElementById('amount').value || 0)));
+  glowUI(); applyGlow();
+}
+
+// ---------- view ----------
+const app = document.getElementById('app');
+const button = (name, icon, { active, note, msg } = {}) => `<div class="control-button control-button--${name}${active ? ' control-button--is-active' : ''}${note ? ' control-button--has-notification' : ''}"><div class="control-button__icon">${icon}${ICONS.badge}</div>${note && msg ? `<div class="control-button__message">${msg}</div>` : ''}</div>`;
+let pet = null, bagOpen = false, pickerOpen = false, listShown = false, listPets = [], listT = null;
+
+function renderPet(){
+  const a = S.activePet.active, g = S.activeGoodies.active;
+  const motion = pet?.motion || newMotion();
+  pet?.destroy();
+  pet = new Pet({ ...a, hat: g.hat, glasses: g.glasses, toy: g.toy, mood: S.mood }, { motion });
+  pet.attach(app, app.firstChild);
+  xpUI();
+  app.className = ['bg--' + (a.bgColor || 'light-blue'), a.name?.special].filter(Boolean).join(' ');
+}
+function renderControls(){
+  app.querySelectorAll('.goody-bag, .pet-picker').forEach(n => n.remove());
+  listPets.forEach(p => p.destroy()); listPets = [];
+  const G = S.collectedGoodies, A = S.activeGoodies;
+  const bag = document.createElement('div'); bag.className = 'goody-bag' + (bagOpen ? ' goody-bag--is-open' : '');
+  bag.innerHTML = button('goody-bag', ICONS.bag, { active:bagOpen, note:G.newItems.length && !bagOpen, msg:'New goodies!' })
+    + `<div class="goodies__list">${G.list.map(id => { const it = T.GOODIES[id];
+        return `<div class="goodies__list__goody${A.active[it.type] === id ? ' goodies__list__goody--is-active' : ''}${G.newItems.includes(id) ? ' goodies__list__goody--is-new' : ''}" data-id="${id}"><img alt="${it.type} goody" src="extension-assets/${it.type}/${it.name}.svg">${ICONS.badge}</div>`; }).join('')}</div>`
+    + button('shuffle', ICONS.shuffle, { active:A.shuffle });
+  bag.querySelector('.control-button--goody-bag').onclick = () => { G.newItems = []; save(); setTimeout(() => { bagOpen = !bagOpen; renderControls(); }, 20); };
+  bag.querySelectorAll('.goodies__list__goody').forEach(el => el.onclick = () => {   // wear it, or take it off; picking by hand stops the shuffle
+    const it = T.GOODIES[el.dataset.id]; A.active[it.type] = A.active[it.type] === it.id ? undefined : it.id; A.shuffle = false; save(); renderPet(); renderControls(); });
+  bag.querySelector('.control-button--shuffle').onclick = () => { if (A.shuffle) A.shuffle = false; else { A.active = shuffleGoodies(); A.shuffle = true; renderPet(); } save(); renderControls(); };
+
+  const pp = document.createElement('div'); pp.className = 'pet-picker' + (pickerOpen ? ' pet-picker--is-open' : '');
+  pp.innerHTML = `<div class="pet-picker__controls">${button('pet-picker', ICONS.house, { active:pickerOpen })}${collectedTypes().length > 1 ? button('shuffle', ICONS.shuffle, { active:S.activePet.shuffle }) : ''}${button('close-pet-picker', ICONS.x)}</div><div class="pet-picker__page"></div>`;
+  const toggle = () => { pickerOpen = !pickerOpen; clearTimeout(listT);
+    if (pickerOpen) listShown = true; else listT = setTimeout(() => { listShown = false; renderControls(); }, 500);   // list stays while the page slides away
+    renderControls(); };
+  pp.querySelector('.control-button--pet-picker').onclick = toggle; pp.querySelector('.control-button--close-pet-picker').onclick = toggle;
+  const sh = pp.querySelector('.control-button--shuffle');
+  if (sh) sh.onclick = () => { const was = S.activePet.shuffle; S.activePet.shuffle = !was;
+    if (!was) { const cur = S.activePet.active.petType, t = pick(collectedTypes().filter(p => p.sku !== cur.sku));   // turning shuffle on swaps the pet right away
+      S.activePet.active = { ...S.activePet.active, petType:t, ...forPicker(t.type) }; renderPet(); setTimeout(() => { if (pickerOpen) toggle(); }, 200); }
+    save(); renderControls(); };
+  if (listShown) {
+    const list = document.createElement('div'); list.className = 'pet-picker__list';
+    for (const t of collectedTypes()) {
+      const attrs = { petType:t, ...forPicker(t.type) }, p = new Pet(attrs, { displayName:t.displayName });
+      const item = document.createElement('div'); item.className = 'pet-picker__list__item' + (S.activePet.active.petType.name === t.name ? ' pet-picker__list__item--is-active' : '');
+      item.append(p.root); list.append(item); listPets.push(p);
+      item.onclick = () => { const cur = S.activePet.active;
+        S.activePet.shuffle = false; S.activePet.active = { ...cur, ...attrs, name: cur.name?.special ? cur.name : attrs.name };   // a special name survives a pet swap
+        save(); renderPet(); setTimeout(() => { if (pickerOpen) toggle(); }, 100); };
+    }
+    pp.querySelector('.pet-picker__page').append(list);
+  }
+  app.append(bag, pp);
+}
+document.addEventListener('keydown', e => { if (e.code === 'Escape' && pickerOpen) app.querySelector('.control-button--close-pet-picker').click(); });
+renderPet(); renderControls();
+</script>
+</body>
+</html>
