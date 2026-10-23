@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'dart:io';
 
 import 'package:critter_engine/critter_engine.dart';
@@ -43,6 +45,29 @@ void main() {
       final happy = compose(catalog, const CritterSpec(species: 'v6_bloop', form: 3, mood: CritterMood.happy))!;
       expect(happy.base, isNot(contains(mouth.d!)));
       expect(kid.character.height, closeTo(115, 1), reason: 'drawn at the art\'s own scale, like v6/index.html');
+    });
+
+    test('rich: smirk behind shades, coin bubble and money bag; parses from json', () {
+      expect(CritterSpec.fromJson({'species': 'v6_pup', 'mood': 'rich'}).mood, CritterMood.rich);
+      expect(CritterMood.rich.wire, 'rich');
+      final rich = compose(catalog, const CritterSpec(species: 'v6_pup', form: 5, mood: CritterMood.rich, attachments: CritterAttachments(eyes: 'goggles')))!;
+      final shades = compose(catalog, const CritterSpec(species: 'v6_pup', form: 5, attachments: CritterAttachments(eyes: 'shades')))!;
+      expect(rich.overlay, shades.overlay, reason: 'the mood puts on shades instead of the spec\'s goggles');
+      expect(rich.prop, contains('#c9a36b'), reason: 'money bag on the ground');
+      expect(rich.prop, contains('#b07d00'), reason: 'the drawn ₹ on the coin bubble');
+    });
+
+    test('a mood mouth is never tiny next to the eyes (cute frens draw small mouths)', () {
+      for (final s in catalog.speciesIn('v6_cute')) {
+        for (final f in s.forms) {
+          final a = catalog.characters[f.character]!.anchors;
+          if (a.eyeSpan == 0) continue;
+          final comp = compose(catalog, CritterSpec(species: s.id, form: s.forms.indexOf(f), mood: CritterMood.happy))!;
+          final grin = RegExp(r'<path d="M(-?[\d.]+) [-\d.]+ Q0 [-\d.]+ ([\d.]+) [-\d.]+Z" fill="#2b2a33"/>').firstMatch(comp.base)!;
+          final width = double.parse(grin[2]!) - double.parse(grin[1]!);
+          expect(width, greaterThanOrEqualTo(math.min(a.eyeSpan * .4, math.max(14, a.headWidth * .42)) - .02), reason: f.character);
+        }
+      }
     });
   });
 

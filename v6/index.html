@@ -295,7 +295,7 @@ function glowParts(i, c, A){
 
 // ---------- emotions: a face (mouth, brows, cheeks, tear), idle body motion, floating particles,
 // and a thought bubble / cloud / ground item that says what the critter is up to ----------
-const EMOTIONS = ['happy','sad','food','entertainment','travel','shopping','empty_wallet'];
+const EMOTIONS = ['happy','sad','food','entertainment','travel','shopping','empty_wallet','rich'];
 const EMO = {
   happy:         { mouth:'grin',  cheeks:true, motion:{ jump:7, freq:1.8, sway:3, squash:.08 }, fx:{ every:500, glyphs:['✦','♥','✦'], colors:['#f6c945','#f2679b','#ffb800'] } },
   sad:           { mouth:'frown', brows:true, tear:true, cloud:true, motion:{ slump:.07, lean:-3, freq:.5, sway:1.5 }, fx:{ every:160, rain:true } },
@@ -305,9 +305,12 @@ const EMO = {
   shopping:      { mouth:'open',  bubble:'bag', ground:'bags', motion:{ jump:5, freq:2.2, sway:2, squash:.06 }, fx:{ every:520, glyphs:['$','%','$'], colors:['#2f9e44','#e8494b','#e0a800'] } },
   // sad face + slumped and sighing, holding an empty wallet upside down that it keeps shaking: moths and dust come out, "₹0" floats up
   empty_wallet:  { mouth:'frown', brows:true, tear:true, wallet:true, bubble:'zero', motion:{ slump:.09, lean:-2, freq:.45, sway:1.2, squash:.05 }, fx:{ every:1400, wallet:true, glyphs:['₹0'], colors:['#9a9184'] } },
+  // the opposite of empty_wallet: smug smirk behind shades, a fat money bag and a coin stack, ₹ and sparkles rising
+  rich:          { mouth:'smirk', eyes:'Shades', bubble:'coin', ground:'riches', motion:{ jump:3, freq:1, sway:2.5, lean:2, squash:.04 }, fx:{ every:380, glyphs:['₹','✦','₹'], colors:['#e0a800','#f6c945','#2f9e44'] } },
 };
 const INK = '#2b2a33';
 const ICONS = {   // ~24 units, centred on 0,0
+  coin:    `<circle r="11" fill="#f6c945" stroke="#e0a800" stroke-width="2.4"/><path d="M-4.5 -6 H4.5 M-4.5 -2.5 H4.5 M-3 -6 Q2.5 -6 2.5 -2.5 Q2.5 1 -3 1 L3 6.5" stroke="#b07d00" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
   zero:    `<text y="6" font-size="16" font-weight="800" text-anchor="middle" fill="#e8494b">₹0</text>`,
   burger:  `<path d="M-11 -1 Q-11 -11 0 -11 Q11 -11 11 -1Z" fill="#f0a64a"/><circle cx="-4" cy="-7" r=".9" fill="#fff4d6"/><circle cx="3" cy="-8" r=".9" fill="#fff4d6"/><rect x="-12" y="-1" width="24" height="3" rx="1.5" fill="#7cc23c"/><rect x="-11" y="2" width="22" height="4" rx="2" fill="#8a4b2f"/><path d="M-11 6 H11 Q11 10 0 10 Q-11 10 -11 6Z" fill="#f0a64a"/>`,
   popcorn: `<circle cx="-5" cy="-5" r="4" fill="#fff1b8"/><circle cx="1" cy="-7" r="4.4" fill="#fffbe6"/><circle cx="6" cy="-4" r="3.8" fill="#fff1b8"/><path d="M-9 -2 L9 -2 L6 12 L-6 12Z" fill="#fff"/><path d="M-5 -2 L-4 12 M0 -2 V12 M5 -2 L4 12" stroke="#e8494b" stroke-width="2.4"/>`,
@@ -315,15 +318,17 @@ const ICONS = {   // ~24 units, centred on 0,0
   bag:     `<path d="M-9 -4 H9 L10 11 H-10Z" fill="#f2679b"/><path d="M-5 -4 Q-5 -11 0 -11 Q5 -11 5 -4" stroke="#c94d7f" stroke-width="2" fill="none"/>`,
 };
 const GROUND_ITEMS = {   // stand on the ground, drawn leftwards from (0,0)
+  riches:   `<path d="M-44 0 Q-52 -24 -36 -32 L-39 -38 H-25 L-28 -32 Q-12 -24 -20 0Z" fill="#c9a36b"/><path d="M-37 -33 H-27" stroke="#8a6a3b" stroke-width="2.5" stroke-linecap="round"/><path d="M-36 -19 H-28 M-36 -16 H-28 M-34.6 -19 Q-29.8 -19 -29.8 -16 Q-29.8 -13 -34.6 -13 L-29.4 -8.5" stroke="#8a6a3b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/><ellipse cx="-9" cy="-2.5" rx="7" ry="2.6" fill="#f6c945" stroke="#e0a800" stroke-width="1.4"/><ellipse cx="-9" cy="-6.5" rx="7" ry="2.6" fill="#f6c945" stroke="#e0a800" stroke-width="1.4"/><ellipse cx="-8" cy="-10.5" rx="7" ry="2.6" fill="#f6c945" stroke="#e0a800" stroke-width="1.4"/><ellipse cx="-9" cy="-14.5" rx="7" ry="2.6" fill="#ffe27a" stroke="#e0a800" stroke-width="1.4"/>`,
   suitcase: `<rect x="-32" y="-24" width="32" height="22" rx="4" fill="#c9714e"/><path d="M-21 -24 V-29 H-11 V-24" stroke="#8a4b2f" stroke-width="2.5" fill="none"/><path d="M-32 -14 H0" stroke="#8a4b2f" stroke-width="2"/><rect x="-14" y="-21" width="8" height="5" rx="1" fill="#f6c945"/><circle cx="-27" cy="-1" r="2.5" fill="#555"/><circle cx="-5" cy="-1" r="2.5" fill="#555"/>`,
   bags:     `<path d="M-38 -24 H-20 L-18 0 H-40Z" fill="#3a85f2"/><path d="M-34 -24 Q-34 -32 -29 -32 Q-24 -32 -24 -24" stroke="#2f6fd0" stroke-width="2" fill="none"/><path d="M-22 -18 H-2 L0 0 H-24Z" fill="#f2679b"/><path d="M-17 -18 Q-17 -26 -12 -26 Q-7 -26 -7 -18" stroke="#c94d7f" stroke-width="2" fill="none"/><text x="-12" y="-6" font-size="9" font-weight="800" text-anchor="middle" fill="#fff">%</text>`,
 };
 function emoMouth(kind, A){
-  // headW can under-measure on multi-part bodies, hence the 14 floor
-  const w = clamp(A.mouthW*1.1, 9, Math.max(14, A.headW*.42)), [x, y] = A.mouthC, sw = Math.max(2, w*.13).toFixed(1), h = w/2;
+  // sized from the art's own mouth, but never small next to the eyes (cute frens draw tiny mouths); headW can under-measure on multi-part bodies, hence the 14 floor
+  const w = clamp(Math.max(A.mouthW*1.1, A.span*.4, A.eyeR*2.2), 9, Math.max(14, A.headW*.42)), [x, y] = A.mouthC, sw = Math.max(2, w*.13).toFixed(1), h = w/2;
   const at = inner => `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})">${inner}</g>`;
   return at({
     grin:  `<path d="M${-h} ${-w*.1} Q0 ${w*.75} ${h} ${-w*.1}Z" fill="${INK}"/><path d="M${-h*.6} ${-w*.02} H${h*.6}" stroke="#fff" stroke-width="${(w*.1).toFixed(1)}" stroke-linecap="round"/><ellipse cx="0" cy="${w*.3}" rx="${w*.2}" ry="${w*.1}" fill="#f0788e"/>`,
+    smirk: `<path d="M${-h*.8} ${w*.06} Q${h*.15} ${w*.42} ${h*.85} ${-w*.16}" stroke="${INK}" stroke-width="${sw}" stroke-linecap="round" fill="none"/><path d="M${h*.7} ${-w*.26} L${h*.98} ${-w*.06}" stroke="${INK}" stroke-width="${(sw*.8).toFixed(1)}" stroke-linecap="round"/>`,
     smile: `<path d="M${-h*.8} 0 Q0 ${w*.5} ${h*.8} 0" stroke="${INK}" stroke-width="${sw}" stroke-linecap="round" fill="none"/>`,
     frown: `<path d="M${-h*.75} ${w*.22} Q0 ${-w*.2} ${h*.75} ${w*.22}" stroke="${INK}" stroke-width="${sw}" stroke-linecap="round" fill="none"/>`,
     open:  `<ellipse cx="0" cy="${w*.08}" rx="${w*.3}" ry="${w*.36}" fill="${INK}"/><ellipse cx="0" cy="${w*.28}" rx="${w*.18}" ry="${w*.1}" fill="#f0788e"/>`,

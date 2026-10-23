@@ -1,6 +1,6 @@
 ---
 name: critter-engine
-description: Add and use the critter_engine Flutter package (github.com/madrix01/tabby) to render evolving pet critters (art sets v3, v4 and the v6 frens, usable side by side) with hats, eyewear, neck items and props from a JSON spec. Use when installing critter_engine, rendering a CritterView, building or validating critter JSON payloads (species, form, attachments, inline items), defining custom items as JSON, using the glow look (glow, halo, shadow, shading), setting a mood (happy, sad, food, entertainment, travel, shopping, empty_wallet), playing the send-money animation between two critters (MoneyTransferView), or adding new characters or items to the catalog.
+description: Add and use the critter_engine Flutter package (github.com/madrix01/tabby) to render evolving pet critters (art sets v3, v4 and the v6 frens, usable side by side) with hats, eyewear, neck items and props from a JSON spec. Use when installing critter_engine, rendering a CritterView, building or validating critter JSON payloads (species, form, attachments, inline items), defining custom items as JSON, using the glow look (glow, halo, shadow, shading), setting a mood (happy, sad, food, entertainment, travel, shopping, empty_wallet, rich), animating a critter (breathing, blinking, mood motion and particles), playing the send-money animation between two critters (MoneyTransferView), or adding new characters or items to the catalog.
 ---
 
 # critter_engine
@@ -54,7 +54,7 @@ final spec = CritterSpec.fromJson(payloadFromBackend);   // Map<String, dynamic>
 
 SizedBox(
   width: 240,                                   // the view fills the width at a fixed 4:3 aspect
-  child: CritterView(catalog: catalog, spec: spec),
+  child: CritterView(catalog: catalog, spec: spec),   // animate: true to make it breathe, blink and play its mood
 )
 ```
 
@@ -86,7 +86,7 @@ SizedBox(
 | `xp` | Optional. Only grows the critter slightly within its current form. It does **not** change `form`. |
 | `attachments` | One item id per slot: `hat`, `eyes`, `neck`, `prop`. A missing slot means empty. |
 | `behaviour` | Parsed and carried through, but not used for rendering yet (reserved for animation). |
-| `mood` | `happy`, `sad`, `food`, `entertainment`, `travel`, `shopping` or `empty_wallet` (see below). Leave it out for the critter's own face. |
+| `mood` | `happy`, `sad`, `food`, `entertainment`, `travel`, `shopping`, `empty_wallet` or `rich` (see below). Leave it out for the critter's own face. |
 | `look` | `"flat"` (default) or `"glow"`: shaded glossy bodies, eye glints, a contact shadow and a colour halo. Use it on dark backgrounds. `CritterView(look: CritterLook.glow)` overrides the spec. |
 | `glow` | Optional tuning for the glow look. The defaults are `halo` 0.35 (range 0–1), `blur` 0.8 (0–3), `brightness` 1 (1–2), `shading` 1.5, `gloss` 0.45 and `shadow` 1.5 (each 0–1.5, where 0 = off), and `color` `#rrggbb` to tint the halo. Values are clamped and missing knobs keep their defaults. `CritterView(glow: CritterGlow(...))` overrides it. |
 | `items` | Optional inline item definitions; see section 5. |
@@ -213,11 +213,13 @@ A bad inline item is dropped, with a debug message, and the critter still render
 | `travel` | soft smile | plane thought bubble, suitcase on the ground |
 | `shopping` | excited open mouth | shopping-bag thought bubble, shopping bags on the ground |
 | `empty_wallet` | frown, worried brows, a tear (sad, no rain cloud) | an open wallet held upside down at its right side, and a red `₹0` thought bubble |
+| `rich` | smug smirk, wears the `shades` (replacing the spec's eyewear) | a gold `₹` coin thought bubble, a money bag and a coin stack on the ground (left) |
 
-- The mood's mouth replaces the character's own, and works for one-eyed and mouthless characters too.
+- The mood's mouth replaces the character's own, and works for one-eyed and mouthless characters too. It is sized from the eyes as well as the art's mouth, so it stays readable on the cute frens.
 - Hats, neck items and props still apply. A ground item from a mood (suitcase, bags) stands on the left, so it doesn't collide with the prop on the right.
 - In code, `spec.copyWith(mood: CritterMood.sad)` sets a mood and `copyWith(clearMood: true)` removes it. `empty_wallet` is `CritterMood.emptyWallet` in Dart (`mood.wire` gives the JSON value).
-- Motion such as bouncing, floating notes, falling rain, and the wallet shaking with moths and dust falling out isn't drawn by the package yet; it is static for now. `v3/index.html` shows the animated version.
+- `rich` is `CritterMood.rich` in Dart. The `moods_v6` golden shows every mood on the v6 frens.
+- **Motion:** pass `CritterView(..., animate: true)`. The critter breathes and blinks, and the mood plays its body language (happy bounces, sad slumps, rich struts) and floating effects (sparkles, notes, ₹ signs, rain from the cloud, dust and moths from the empty wallet). It's off by default and stays off when the OS asks for reduced motion. The chewing mouth, the falling tear and the wallet shake are still prototype-only (`v6/index.html`).
 
 ## 7. Glow look (halo, shading, shadow)
 
@@ -303,7 +305,7 @@ Notes:
 - **Golden tests:** under `flutter test` the labels render in the test font, as boxes. On a device they use the app's font.
 
 ## 9. Limits to know before building on it
-- **Only the send-money animation moves.** `CritterView` itself is static: gaits, blinking, petting, dancing, the mood effects and the evolution flash exist in the browser prototype (`v3/index.html`) and are still planned for the package. `behaviour` is parsed for that future use.
+- **Idle and mood animation only.** `CritterView(animate: true)` breathes, blinks and plays the mood's motion and particles. Gaits, petting, dancing and the evolution flash exist only in the browser prototypes. `behaviour` is parsed for that future use.
 - **One item per slot.** A critter can't hold a money bag and a gold bar at once.
 - **Art comes from the catalog.** New characters need the compiler (section 10); they can't be sent as JSON.
 - **Two-headed character 23** (Twinny in the `ember` line): it gets its hat between the heads and its glasses spanning both.

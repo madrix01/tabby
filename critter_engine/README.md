@@ -27,11 +27,11 @@ CritterView(catalog: catalog, spec: CritterSpec.fromJson(payload));
 - **`species` / `form`:** the evolution line and the stage in it. The server decides `form`, and the engine clamps it to the line. Unknown species render nothing.
 - **`xp`:** optional. It only grows the critter slightly within its current form.
 - **`attachments`:** item ids. They resolve against this spec's `items` first, then the catalog. Unknown ids are skipped.
-- **`behaviour`:** carried through for the animation layer (phase 3).
+- **`behaviour`:** carried through for a later animation layer (gaits, petting); `animate` doesn't read it yet.
 
 ## Mood
 
-`"mood"` is one of `happy`, `sad`, `food`, `entertainment`, `travel`, `shopping` or `empty_wallet`. Leave it out for the critter's own face; unknown values are ignored.
+`"mood"` is one of `happy`, `sad`, `food`, `entertainment`, `travel`, `shopping`, `empty_wallet` or `rich`. Leave it out for the critter's own face; unknown values are ignored.
 
 | mood | face | around it |
 |---|---|---|
@@ -42,8 +42,34 @@ CritterView(catalog: catalog, spec: CritterSpec.fromJson(payload));
 | `travel` | soft smile | plane thought bubble, suitcase on the ground |
 | `shopping` | excited open mouth | shopping-bag thought bubble, shopping bags on the ground |
 | `empty_wallet` | frown, worried brows, a tear | an open wallet held upside down, `₹0` thought bubble (`CritterMood.emptyWallet` in Dart) |
+| `rich` | smug smirk, wears the `shades` (replacing any eyewear) | gold `₹` coin thought bubble, money bag and coin stack on the ground |
 
-The mood's mouth replaces the character's own. The bubble, cloud and ground item are on the prop layer, so they don't tilt with the body. Motion effects (bouncing, floating notes, falling rain) are in the browser prototype and come to the package with the animation layer.
+The mood's mouth replaces the character's own, and is never drawn smaller than the eyes call for (the cute frens draw tiny mouths of their own). The bubble, cloud and ground item are on the prop layer, so they don't tilt with the body. `goldens/moods_v6.png` shows every mood on the frens.
+
+## Animation
+
+```dart
+CritterView(catalog: catalog, spec: spec, animate: true)
+```
+
+Every critter breathes and blinks. A mood adds its body language and what floats off it:
+
+| mood | body language | floating off it |
+|---|---|---|
+| `happy` | bounces | gold sparkles and hearts |
+| `sad` | slumps and leans back | rain falls from the cloud |
+| `food` | small happy bob | "nom", "yum" |
+| `entertainment` | bops and sways to the music | music notes |
+| `travel` | light bounce, leaning forward | ✈ |
+| `shopping` | quick excited hops | $ and % tags |
+| `empty_wallet` | slumps and sighs | dust and moths out of the wallet, a grey ₹0 |
+| `rich` | proud strut, chest out | ₹ signs and sparkles |
+
+- **Off by default.** Turn it on where a critter is the focus; leave it off in long lists and for still renders.
+- **Reduce motion:** when the OS asks for less motion, the critter stays still.
+- **Cost:** one ticker per animated critter. The SVG layers are built once and only moved, so a frame is a transform and a few particles.
+- **Not ported from the prototype:** the chewing mouth, the falling tear, the wallet shaking, walking, dancing, petting and the evolution flash.
+
 
 ## Look
 

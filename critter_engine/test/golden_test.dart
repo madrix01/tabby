@@ -171,6 +171,31 @@ void main() {
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/moods.png'));
   });
 
+  testWidgets('moods on the v6 frens, unisex flat and cute glow', (tester) async {
+    tester.view.physicalSize = const Size(1600, 340);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    const moods = ['happy', 'sad', 'food', 'entertainment', 'travel', 'shopping', 'empty_wallet', 'rich'];
+    const frens = ['bloop', 'mochi', 'puff', 'pup', 'berry', 'pickle', 'chiku', 'bun'];
+    await tester.pumpWidget(MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Column(children: [
+        for (final (set, look, bg) in [('v6', 'flat', const Color(0xfffbf8f2)), ('v6_cute', 'glow', const Color(0xff2a2522))])
+          Expanded(
+            child: ColoredBox(
+              color: bg,
+              child: GridView.count(crossAxisCount: 8, childAspectRatio: 4 / 3, padding: const EdgeInsets.all(8), children: [
+                for (final (k, mood) in moods.indexed)
+                  CritterView(catalog: catalog, spec: CritterSpec.fromJson({'species': '${set}_${frens[k]}', 'form': 3 + k % 3, 'mood': mood, 'look': look})),
+              ]),
+            ),
+          ),
+      ]),
+    ));
+    await settle(tester);
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/moods_v6.png'));
+  });
+
   testWidgets('items sent as JSON', (tester) async {
     tester.view.physicalSize = const Size(1200, 330);
     tester.view.devicePixelRatio = 1;

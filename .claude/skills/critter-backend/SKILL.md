@@ -1,6 +1,6 @@
 ---
 name: critter-backend
-description: Backend contract for the critter pets rendered by the critter_engine Flutter app (github.com/madrix01/tabby). Use when building, validating or reviewing any JSON a backend sends to the frontend about critters/blobs/pets — the critter spec (species, form/evolution stage, xp, attachments, mood incl. empty_wallet, look/glow), custom item definitions (hats, eyewear, neck items, props as SVG), the item store list, or the money transfer (send money) payload — and when you need the valid slugs for species (v3, v4 and v6 frens sets), forms, items, moods or looks, or the xp-to-level/evolution math.
+description: Backend contract for the critter pets rendered by the critter_engine Flutter app (github.com/madrix01/tabby). Use when building, validating or reviewing any JSON a backend sends to the frontend about critters/blobs/pets — the critter spec (species, form/evolution stage, xp, attachments, mood incl. empty_wallet and rich, look/glow), custom item definitions (hats, eyewear, neck items, props as SVG), the item store list, or the money transfer (send money) payload — and when you need the valid slugs for species (v3, v4 and v6 frens sets), forms, items, moods or looks, or the xp-to-level/evolution math.
 ---
 
 # Critter backend contract
@@ -51,7 +51,7 @@ There is no envelope or `type` field in the contract. The endpoint decides which
 | `form` | int | no | `0` | Stage index, from 0 to forms−1 of that species (section 4). |
 | `xp` | number | no | | Grows the critter slightly within its current form. It does **not** change the form. |
 | `attachments` | object | no | `{}` | Keys are `hat`, `eyes`, `neck`, `prop`; each value is an item slug (section 5) or the id of an item in `items`. Leave a key out for an empty slot. |
-| `mood` | string | no | none | `happy`, `sad`, `food`, `entertainment`, `travel`, `shopping` or `empty_wallet`. Leave it out for the critter's normal face. |
+| `mood` | string | no | none | `happy`, `sad`, `food`, `entertainment`, `travel`, `shopping`, `empty_wallet` or `rich`. Leave it out for the critter's normal face. |
 | `look` | string | no | `flat` | `flat` or `glow`. |
 | `glow` | object | no | the defaults above | Only applies when `look` is `glow`. Send only the knobs you want to change (section 7). |
 | `behaviour` | object | no | as shown | Reserved for animation. `likesPets` is a bool, and `gait` and `state` are strings. Carried through but not rendered yet. |
@@ -168,6 +168,7 @@ One item per slot: a critter can't hold two props at once.
 | `travel` | smile, plane bubble, suitcase on the ground |
 | `shopping` | excited open mouth, shopping-bag bubble, shopping bags on the ground |
 | `empty_wallet` | sad face (frown, brows, tear; no rain cloud), an empty wallet held upside down, a red `₹0` thought bubble. Use it for zero or insufficient balance. |
+| `rich` | smug smirk behind `shades` (these **replace** the spec's `eyes`), a gold `₹` coin bubble, a money bag and a coin stack on the ground. The opposite of `empty_wallet`: use it for a healthy balance, a big credit or a savings milestone. |
 
 ## 6. XP, levels and evolution (server-side)
 

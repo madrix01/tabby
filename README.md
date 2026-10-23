@@ -10,7 +10,7 @@ Pets you raise. Each critter evolves and wears items. The project started from r
 | `critter_engine/` | Flutter package. It renders a critter from a JSON spec (species, form, attachments and inline items) using the catalog. |
 | `v3/` | Browser prototype of the current engine. Open `index.html`. |
 | `v4/` | v3 rebuilt on the `shapes_v4/` art (`build_shapes.py` makes `shapes.js`). |
-| `v6/` | v3 with the Frens art from `frens-svgs/` (8 frens × 7 stages, unisex and cute sets; `build_frens.py` makes `characters.js`). |
+| `v6/` | v3 with the Frens art from `frens-svgs/` (8 frens × 7 stages, unisex and cute sets; `build_frens.py` makes `characters.js`), with every mood including `rich`. |
 | `v5/` | The Tabby Cat new-tab page rebuilt without React, using the extension's art and CSS (`pets.js`), plus v3's moods, growth, glow and send money. |
 | `v2/`, `blobs/` | Earlier browser prototypes with other art styles. |
 

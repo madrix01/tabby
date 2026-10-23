@@ -238,7 +238,7 @@ for (const [collection, file] of [['v3', 'evolution_sheet.svg'], ['v4', 'evoluti
           xp: { type: 'number', minimum: 0, description: 'Optional. Only grows the critter inside its current form; does not change form.' },
           attachments: { type: 'object', additionalProperties: false,
             properties: { hat: slotRef('hat'), eyes: slotRef('eyes'), neck: slotRef('neck'), prop: slotRef('prop') } },
-          mood: { enum: ['happy', 'sad', 'food', 'entertainment', 'travel', 'shopping', 'empty_wallet'] },
+          mood: { enum: ['happy', 'sad', 'food', 'entertainment', 'travel', 'shopping', 'empty_wallet', 'rich'] },
           look: { enum: ['flat', 'glow'], default: 'flat' },
           glow: { type: 'object', additionalProperties: false, properties: {
             halo: num(0, 1, .35, 'Halo opacity'), blur: num(0, 3, .8, 'Halo size'), brightness: num(1, 2, 1, 'Halo brightness (ignored with color)'),

@@ -15,3 +15,4 @@ critter_engine/build/
 critter_engine/.flutter-plugins
 critter_engine/.flutter-plugins-dependencies
 critter_engine/pubspec.lock
+critter_engine/test/failures/
