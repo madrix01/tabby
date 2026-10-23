@@ -10,7 +10,7 @@
   body { margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
          color:var(--ink); font:16px/1.4 var(--sans); background:var(--paper); }
   h1 { margin:0; font:800 1.3rem var(--sans); letter-spacing:.28em; text-transform:uppercase; }
-  #stage { width:min(98vw,1040px); }
+  #stage { width:min(98vw,1400px); }
   svg { width:100%; height:auto; overflow:visible; display:block; }
   .pet { cursor:pointer; transition:opacity .4s; }
   .pet.dim { opacity:.15; }
@@ -44,6 +44,16 @@
   .emo  { font:800 15px var(--sans); text-anchor:middle; pointer-events:none; transform-box:fill-box; transform-origin:50% 50%; animation:emoUp 1.6s ease-out forwards; }   /* scale around itself, not the svg origin */
   .rain { stroke:#7fb6e8; stroke-width:2; stroke-linecap:round; pointer-events:none; animation:rain .7s linear forwards; }
   .tear { transform-box:fill-box; animation:tear 1.6s ease-in infinite; }
+  /* empty wallet: the wallet shakes every beat, moths flutter out, a little dust falls */
+  .shake { animation:shake 1.4s ease-in-out infinite; }
+  .moth  { pointer-events:none; animation:mothFly 2.4s ease-out forwards; }
+  .flap  { transform-box:fill-box; transform-origin:50% 50%; animation:flap .12s linear infinite alternate; }
+  .dust  { fill:#b9b2a6; pointer-events:none; animation:dust .9s ease-in forwards; }
+  @keyframes shake   { 0%, 58%, 100% { transform:rotate(0); } 64% { transform:rotate(-14deg); } 71% { transform:rotate(11deg); } 78% { transform:rotate(-8deg); } 85% { transform:rotate(5deg); } }
+  @keyframes mothFly { 0% { transform:translate(0,0) scale(.6); opacity:0; } 10% { opacity:1; } 40% { transform:translate(var(--dx),-28px) scale(1); }
+                       70% { transform:translate(calc(var(--dx) * -.5),-54px) scale(1); opacity:1; } 100% { transform:translate(var(--dx),-84px) scale(.9); opacity:0; } }
+  @keyframes flap    { to { transform:scaleY(.25); } }
+  @keyframes dust    { to { transform:translateY(26px); opacity:0; } }
   .chew { transform-box:fill-box; transform-origin:50% 50%; animation:chew .3s ease-in-out infinite alternate; }
   @keyframes emoUp { 0% { transform:translate(0,0) scale(.6); opacity:0; } 15% { opacity:1; } 100% { transform:translate(var(--dx),-55px) scale(1.1); opacity:0; } }
   @keyframes rain  { to { transform:translateY(34px); opacity:0; } }
@@ -69,7 +79,7 @@
 </head>
 <body>
   <h1>Critters</h1>
-  <div id="stage"><svg id="svg" viewBox="-30 -20 760 330"></svg></div>
+  <div id="stage"><svg id="svg" viewBox="0 -20 1300 330"></svg></div>
   <div id="ui">
     <div id="name"></div>
     <div id="xpinfo"></div><div style="min-width:100%;text-align:center"><progress id="xp" max="1" value="0"></progress></div>
@@ -255,7 +265,8 @@ const rnd  = n => Math.floor(Math.random() * n), pick = a => a[rnd(a.length)];
 const pickOrNone = o => { const k = Object.keys(o); return k.concat(k.map(()=>''))[rnd(k.length*2)]; };   // like Tabby: ~half the time nothing
 const roll = () => ({ likesPets: Math.random()>.45, hat:pickOrNone(ITEMS.hat), eyes:pickOrNone(ITEMS.eyes), neck:pickOrNone(ITEMS.neck), prop:pickOrNone(ITEMS.prop), gait:pick(GAIT_NAMES) });
 const START = [[9,30],[0,200],[4,700],[12,200],[2,40]];       // [species, xp]
-const XS = [70,210,350,490,630], GROUND = 250;
+// slots: GAP apart, centred in a STAGE_W-wide stage (raise GAP for more room between critters; keep the svg viewBox in step)
+const GAP = 260, STAGE_W = 1300, XS = [0,1,2,3,4].map(k => STAGE_W/2 + (k - 2)*GAP), GROUND = 250;
 const pos = [...XS], dir = [1,1,1,1,1], mode = ['idle','idle','idle','idle','idle'];   // idle | dance | walk | home
 let pets, sel = 0;
 try { pets = JSON.parse(localStorage.critters1); } catch {}
@@ -297,7 +308,7 @@ function glowParts(i, c, A){
 
 // ---------- emotions: a face (mouth, brows, cheeks, tear), idle body motion, floating particles,
 // and a thought bubble / cloud / ground item that says what the critter is up to ----------
-const EMOTIONS = ['happy','sad','food','entertainment','travel','shopping'];
+const EMOTIONS = ['happy','sad','food','entertainment','travel','shopping','empty_wallet'];
 const EMO = {
   happy:         { mouth:'grin',  cheeks:true, motion:{ jump:7, freq:1.8, sway:3, squash:.08 }, fx:{ every:500, glyphs:['✦','♥','✦'], colors:['#f6c945','#f2679b','#ffb800'] } },
   sad:           { mouth:'frown', brows:true, tear:true, cloud:true, motion:{ slump:.07, lean:-3, freq:.5, sway:1.5 }, fx:{ every:160, rain:true } },
@@ -305,9 +316,12 @@ const EMO = {
   entertainment: { mouth:'grin',  bubble:'popcorn', eyes:'ThreeD', motion:{ jump:6, freq:1.1, sway:11, squash:.06 }, fx:{ every:420, glyphs:['♪','♫'], colors:['#3a85f2','#e8494b','#16b79d','#8c6fd6'] } },
   travel:        { mouth:'smile', bubble:'plane', ground:'suitcase', motion:{ jump:3, freq:1.3, sway:4, lean:3, squash:.03 }, fx:{ every:1400, glyphs:['✈'], colors:['#3a85f2'] } },
   shopping:      { mouth:'open',  bubble:'bag', ground:'bags', motion:{ jump:5, freq:2.2, sway:2, squash:.06 }, fx:{ every:520, glyphs:['$','%','$'], colors:['#2f9e44','#e8494b','#e0a800'] } },
+  // sad face + slumped and sighing, holding an empty wallet upside down that it keeps shaking: moths and dust come out, "₹0" floats up
+  empty_wallet:  { mouth:'frown', brows:true, tear:true, wallet:true, bubble:'zero', motion:{ slump:.09, lean:-2, freq:.45, sway:1.2, squash:.05 }, fx:{ every:1400, wallet:true, glyphs:['₹0'], colors:['#9a9184'] } },
 };
 const INK = '#2b2a33';
 const ICONS = {   // ~24 units, centred on 0,0
+  zero:    `<text y="6" font-size="16" font-weight="800" text-anchor="middle" fill="#e8494b">₹0</text>`,
   burger:  `<path d="M-11 -1 Q-11 -11 0 -11 Q11 -11 11 -1Z" fill="#f0a64a"/><circle cx="-4" cy="-7" r=".9" fill="#fff4d6"/><circle cx="3" cy="-8" r=".9" fill="#fff4d6"/><rect x="-12" y="-1" width="24" height="3" rx="1.5" fill="#7cc23c"/><rect x="-11" y="2" width="22" height="4" rx="2" fill="#8a4b2f"/><path d="M-11 6 H11 Q11 10 0 10 Q-11 10 -11 6Z" fill="#f0a64a"/>`,
   popcorn: `<circle cx="-5" cy="-5" r="4" fill="#fff1b8"/><circle cx="1" cy="-7" r="4.4" fill="#fffbe6"/><circle cx="6" cy="-4" r="3.8" fill="#fff1b8"/><path d="M-9 -2 L9 -2 L6 12 L-6 12Z" fill="#fff"/><path d="M-5 -2 L-4 12 M0 -2 V12 M5 -2 L4 12" stroke="#e8494b" stroke-width="2.4"/>`,
   plane:   `<path d="M-12 3 L11 -3 Q15 -4 14 -1 L-9 6Z" fill="#3a85f2"/><path d="M-1 1 L-7 -9 L-3 -9 L5 -1Z" fill="#2f6fd0"/><path d="M-9 4 L-13 -2 L-11 -2 L-6 3Z" fill="#2f6fd0"/>`,
@@ -339,9 +353,12 @@ function emoFace(e, A){
   return out.join('');
 }
 // where the bubble / cloud sit in character space (also used to spawn particles)
+// open wallet held upside down (opening towards the ground), ~36 wide, centred on 0,0
+const WALLET = `<g transform="rotate(168)"><path d="M-18 0 L-16 -15 Q0 -20 16 -15 L18 0Z" fill="#8a5a3a"/><path d="M-18 0 H18 L16 15 Q0 19 -16 15Z" fill="#a8703f"/>
+  <path d="M-13 0 H13" stroke="#5e3a22" stroke-width="1.6" stroke-linecap="round"/><path d="M-12 -10 H12 L11 -4 H-11Z" fill="#c99a6b"/><rect x="9" y="4" width="8" height="6" rx="2" fill="#f6c945"/></g>`;
 const emoSpots = (A, hat) => { const lift = hat ? A.hat.w*.7 : 0;   // clear the hat if one is worn
   const head = Math.min(A.hat.at[1], A.topY + 6);   // above top-knots and antennae too, not just the hat seat
-  return { bubble:[A.W*.42 + 12, A.hat.at[1] - 12], cloud:[A.eye[0], head - 34 - lift], top:[A.eye[0], head - 8 - lift] }; };
+  return { bubble:[A.W*.42 + 12, A.hat.at[1] - 12], cloud:[A.eye[0], head - 34 - lift], top:[A.eye[0], head - 8 - lift], wallet:[A.W/2 + 2, -A.H*.36] }; };
 function emoExtras(e, A, hat){
   const sp = emoSpots(A, hat), out = [];
   if (e.bubble) { const [x, y] = sp.bubble;
@@ -349,6 +366,7 @@ function emoExtras(e, A, hat){
   if (e.cloud) { const [x, y] = sp.cloud;
     out.push(`<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><circle cx="-10" cy="2" r="8" fill="#9aa3ad"/><circle cx="0" cy="-3" r="10" fill="#9aa3ad"/><circle cx="11" cy="2" r="8" fill="#9aa3ad"/><rect x="-18" y="2" width="37" height="8" rx="4" fill="#9aa3ad"/></g>`); }
   if (e.ground) out.push(`<g transform="translate(${(-A.W/2 + 2).toFixed(1)} 0)">${GROUND_ITEMS[e.ground]}</g>`);
+  if (e.wallet) { const [x, y] = sp.wallet; out.push(`<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><g class="shake">${WALLET}</g></g>`); }
   return out.join('');
 }
 
@@ -444,7 +462,7 @@ function applyPose(i, P){
 const g = i => svg.querySelector(`.pet[data-i="${i}"]`);
 function blink(i){ const el = g(i); if (el) { el.classList.add('blink'); setTimeout(() => el.classList.remove('blink'), 150); } setTimeout(() => blink(i), 600 + Math.random()*3500); }
 pets.forEach((_,i) => setTimeout(() => blink(i), Math.random()*2000));
-setInterval(() => { const i = rnd(5); if (!hover.has(i) && mode[i]==='idle' && !evo[i] && pets[i].emotion !== 'sad') hop(i); }, 2500);
+setInterval(() => { const i = rnd(5); if (!hover.has(i) && mode[i]==='idle' && !evo[i] && !['sad','empty_wallet'].includes(pets[i].emotion)) hop(i); }, 2500);
 // emotion particles: sparkles, notes, $ tags, rain from the cloud...
 const emoClock = [];
 setInterval(() => {
@@ -454,6 +472,16 @@ setInterval(() => {
     const X = v => pos[i] + v*sc, Y = v => GROUND + v*sc;
     if (e.fx.rain) { const l = document.createElementNS(NS,'line'), x = X(sp.cloud[0] + (Math.random()*28 - 14)), y = Y(sp.cloud[1] + 10);
       l.setAttribute('class','rain'); l.setAttribute('x1',x); l.setAttribute('x2',x); l.setAttribute('y1',y); l.setAttribute('y2',y + 6); svg.append(l); setTimeout(() => l.remove(), 700); return; }
+    if (e.fx.wallet) {
+      const wx = X(sp.wallet[0]), wy = Y(sp.wallet[1] + 10);
+      for (let d = 0; d < 3; d++) { const c = document.createElementNS(NS,'circle'); c.setAttribute('class','dust');
+        c.setAttribute('cx', wx + Math.random()*16 - 8); c.setAttribute('cy', wy); c.setAttribute('r', 1.2 + Math.random()*1.6);
+        c.style.animationDelay = (.9 + d*.08) + 's'; c.style.opacity = 0; svg.append(c); setTimeout(() => c.remove(), 2000); }
+      if (Math.random() < .65) {                          // a moth flutters out of the empty wallet
+        const m = document.createElementNS(NS,'g'); m.setAttribute('transform', `translate(${wx.toFixed(1)} ${(wy - 4).toFixed(1)})`);
+        m.innerHTML = `<g class="moth" style="--dx:${(Math.random()*36 - 18).toFixed(0)}px; animation-delay:.9s; opacity:0"><g class="flap"><ellipse cx="-4.5" cy="0" rx="5" ry="3.6" fill="#cfc8bc"/><ellipse cx="4.5" cy="0" rx="5" ry="3.6" fill="#cfc8bc"/></g><ellipse rx="1.6" ry="3.4" fill="#8d877d"/></g>`;
+        svg.append(m); setTimeout(() => m.remove(), 3400); return; }
+    }
     const t = document.createElementNS(NS,'text'), k = rnd(e.fx.glyphs.length);
     t.textContent = e.fx.glyphs[k]; t.setAttribute('class','emo'); t.setAttribute('fill', e.fx.colors[k % e.fx.colors.length]);
     t.setAttribute('x', X(sp.top[0] + (Math.random()*.6 - .3)*A.W)); t.setAttribute('y', Y(sp.top[1])); t.style.setProperty('--dx', (Math.random()*30 - 15) + 'px');
@@ -540,7 +568,7 @@ async function sendMoney(from, to, amount){
   xfer = { who:[from, to] }; [from, to].forEach(i => { if (mode[i] !== 'idle' && mode[i] !== 'home') mode[i] = 'home'; });
   // 1. meet centre stage, sender on the side it already stands
   const left = pos[from] <= pos[to];
-  TGT[from] = left ? 230 : 470; TGT[to] = left ? 470 : 230; mode[from] = mode[to] = 'home'; render();
+  TGT[from] = STAGE_W/2 + (left ? -1 : 1)*GAP*.65; TGT[to] = STAGE_W/2 + (left ? 1 : -1)*GAP*.65; mode[from] = mode[to] = 'home'; render();
   await until(() => mode[from] === 'idle' && mode[to] === 'idle');
   const side = Math.sign(pos[to] - pos[from]);
   // 2. wind-up: sender leans back, shows the amount, then throws
@@ -582,7 +610,7 @@ let last = performance.now();
     if (m==='walk' || m==='home') {
       addXp(i,'walk',dt);
       const sp = (GAITS[pets[i].gait] || GAITS.waddle).speed * Growth.traits(pets[i].xp, SPECIES[pets[i].species].forms, pets[i].form).scale;
-      if (m==='walk') { pos[i] += dir[i]*sp*dt; if (pos[i]>670) { pos[i]=670; dir[i]=-1; } if (pos[i]<30) { pos[i]=30; dir[i]=1; } }
+      if (m==='walk') { pos[i] += dir[i]*sp*dt; if (pos[i]>STAGE_W-40) { pos[i]=STAGE_W-40; dir[i]=-1; } if (pos[i]<40) { pos[i]=40; dir[i]=1; } }
       // home: walk back to the slot, or (sp2: twice as fast) to a send-money meet-up point
       else { const T = TGT[i] ?? XS[i], d = T-pos[i], sp2 = TGT[i] != null ? sp*2 : sp; dir[i] = Math.sign(d)||1; if (Math.abs(d) < sp2*dt) { pos[i]=T; mode[i]='idle'; } else pos[i] += dir[i]*sp2*dt; }
     }
