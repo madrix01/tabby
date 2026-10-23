@@ -1,0 +1,17 @@
+.DS_Store
+
+# third-party Chrome extension used only for reverse engineering; not ours to redistribute
+mefhakmgclhhfbdadeojlkbllmecialg.zip
+# same files as characters/
+characters_individual_svgs.zip
+
+# compiler
+compiler/node_modules/
+compiler/out/
+
+# flutter package
+critter_engine/.dart_tool/
+critter_engine/build/
+critter_engine/.flutter-plugins
+critter_engine/.flutter-plugins-dependencies
+critter_engine/pubspec.lock

@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Critters</title>
+<style>
+  :root { --ink:#2b2a33; --red:#e8494b; --gold:#f6c945; --paper:#fbf8f2; --sans:"Avenir Next","Futura","Trebuchet MS",system-ui,sans-serif; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+         color:var(--ink); font:16px/1.4 var(--sans); background:var(--paper); }
+  h1 { margin:0; font:800 1.3rem var(--sans); letter-spacing:.28em; text-transform:uppercase; }
+  #stage { width:min(98vw,1040px); }
+  svg { width:100%; height:auto; overflow:visible; display:block; }
+  .pet { cursor:pointer; }
+  .label { font:700 10px var(--sans); letter-spacing:.22em; text-anchor:middle; fill:var(--ink); text-transform:uppercase; }
+
+  .eye { transform-box:fill-box; transform-origin:50% 50%; transition:transform .08s; }
+  .blink .eye { transform:scaleY(.1); }
+
+  /* evolution: flash a dark silhouette, then pop into the new form */
+  .pet.evolving .grow { animation:evoFlash .32s steps(1) infinite; }
+  .pw { transform-box:fill-box; transform-origin:50% 100%; }
+  .pet.pop .pw { animation:pop .9s cubic-bezier(.3,1.7,.5,1) 1; }
+  .spark { font-size:18px; fill:var(--gold); pointer-events:none; animation:spark 1.2s ease-out forwards; }
+  .burst { fill:var(--gold); pointer-events:none; transform-box:fill-box; transform-origin:50% 50%; animation:burst 1s ease-out forwards; }
+  .sel-mark { fill:var(--red); }
+  .heart { font-size:20px; fill:var(--red); pointer-events:none; animation:up 1s ease-out forwards; }
+  .lvl { font:800 13px var(--sans); letter-spacing:.1em; fill:var(--red); pointer-events:none; text-anchor:middle; animation:up 1.4s ease-out forwards; }
+  @keyframes evoFlash { 0% { filter:none; } 50% { filter:brightness(0) drop-shadow(0 0 8px var(--gold)); } }
+  @keyframes pop   { 0% { transform:scale(.2,.2); } 60% { transform:scale(1.15,1.15); } 100% { transform:scale(1,1); } }
+  @keyframes spark { from { transform:translate(0,0) scale(.3); opacity:1; } to { transform:translate(var(--dx),var(--dy)) scale(1.2); opacity:0; } }
+  @keyframes burst { from { transform:scale(.2); opacity:.95; } to { transform:scale(9); opacity:0; } }
+  @keyframes up { to { transform:translateY(-60px); opacity:0; } }
+
+  progress { width:200px; height:8px; accent-color:var(--red); }
+  #xpinfo { min-width:100%; text-align:center; font-size:13px; letter-spacing:.04em; }
+  #ui { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:760px; padding:0 12px; align-items:center; }
+  select, button { font:600 14px var(--sans); padding:6px 12px; border-radius:99px; border:2px solid var(--ink); background:transparent; color:var(--ink); cursor:pointer; }
+  button:hover { background:var(--ink); color:#fff; }
+  #name { font-weight:800; min-width:100%; text-align:center; letter-spacing:.2em; text-transform:uppercase; }
+</style>
+</head>
+<body>
+  <h1>Critters</h1>
+  <div id="stage"><svg id="svg" viewBox="-30 -20 760 330"></svg></div>
+  <div id="ui">
+    <div id="name"></div>
+    <div id="xpinfo"></div><div style="min-width:100%;text-align:center"><progress id="xp" max="1" value="0"></progress></div>
+    <select id="species"></select>
+    <select id="hat"></select>
+    <select id="eyes"></select>
+    <select id="neck"></select>
+    <select id="prop"></select>
+    <select id="gait"></select>
+    <button id="roll">Reroll this one</button>
+    <button id="rollAll">Reroll all</button>
+    <span style="min-width:100%"></span>
+    <button id="dance">Dance</button>
+    <button id="run">Walk</button>
+    <button id="danceAll">Dance party</button>
+    <button id="runAll">Parade</button>
+    <button id="stop">Stop all</button>
+    <button id="feed">Feed 🍎</button>
+    <button id="evolve">Evolve ⚡</button>
+  </div>
+<script src="characters.js"></script>
+<script src="growth.js"></script>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const CHARS = Object.fromEntries(window.CHAR_SVGS.map(c => [c.id, c]));
+
+// ---------- species: evolution chains built only from the supplied characters ----------
+const LINES = [
+  [['13','Blip'],    ['25','Cloudbert'], ['01','Blobfred']],
+  [['34','Totem'],   ['11','Cubey'],     ['29','Jellyfin']],
+  [['02','Sprig'],   ['17','Antenna'],   ['16','Broccolord']],
+  [['32','Radish'],  ['36','Mossy']],
+  [['28','Pip'],     ['03','Bean'],      ['15','Tri']],
+  [['37','Ember'],   ['23','Twinny'],    ['08','Archie']],
+  [['18','Pinky'],   ['04','Fluffpaw'],  ['39','Hornsby']],
+  [['05','Bunbun'],  ['35','Kitto'],     ['21','Piggo']],
+  [['30','Stamp'],   ['20','Longcat']],
+  [['24','Squidge'], ['06','Beaky'],     ['10','Mush'],    ['27','Donut']],
+  [['19','Snowy'],   ['07','Pebble']],
+  [['09','Cactoo'],  ['14','Splotch'],   ['38','Teapot']],
+  [['33','Drip'],    ['31','Chick'],     ['26','Ducko']],
+  [['40','Lemon'],   ['12','Bunny'],     ['22','Sunny']],
+];
+const LEVELS = { 2:[1,6], 3:[1,4,8], 4:[1,3,6,10] }, SIZES = { 2:[.75,1.15], 3:[.7,1,1.3], 4:[.65,.9,1.15,1.35] };
+const SPECIES = LINES.map(line => ({ name: line.map(x => x[1]).join(' → '),
+  forms: line.map(([id, name], k) => ({ id, name, at: LEVELS[line.length][k], size: [SIZES[line.length][k]*.92, SIZES[line.length][k]*1.04] })) }));
+
+// ---------- measure each character once: normalise to feet-at-origin, then find eyes, head top, neck, side ----------
+const probe = document.createElementNS(NS,'svg'); probe.setAttribute('style','position:absolute;width:0;height:0;visibility:hidden'); document.body.append(probe);
+const translateOf = el => { const m = /translate\(([-\d.]+)[ ,]+([-\d.]+)\)/.exec(el.getAttribute('transform') || ''); return m ? [+m[1], +m[2]] : [0,0]; };
+const ANCH = {};
+function analyze(id){
+  if (ANCH[id]) return ANCH[id];
+  const c = CHARS[id], g = document.createElementNS(NS,'g');
+  g.innerHTML = `<g class="s">${c.skin.join('')}</g><g class="k">${c.ink.join('')}</g>`; probe.append(g);
+  const bb = g.querySelector('.s').getBBox(), s0 = Math.min(100/bb.height, 150/bb.width), cx = bb.x + bb.width/2, bot = bb.y + bb.height;
+  const N = (x, y) => [(x-cx)*s0, (y-bot)*s0];
+  // outline points of every coloured part (normalised)
+  const pts = []; for (const p of g.querySelectorAll('.s path')) { const [tx,ty] = translateOf(p), L = p.getTotalLength(), n = 300;
+    const ring = []; for (let k=0;k<n;k++){ const q = p.getPointAtLength(L*k/n); ring.push(N(q.x+tx, q.y+ty)); } pts.push(ring); }
+  // ink parts: eyes are the upper ones, mouth the lower ones
+  const ink = [...g.querySelectorAll('.k > *')].map((el, idx) => { const b = el.getBBox(), [tx,ty] = translateOf(el), [x0,y0] = N(b.x+tx, b.y+ty), [x1,y1] = N(b.x+b.width+tx, b.y+b.height+ty);
+    return { idx, cx:(x0+x1)/2, cy:(y0+y1)/2, r:Math.max(x1-x0, y1-y0)/2, bottom:y1 }; });
+  let eyes = ink, mouth = [];
+  if (ink.length === 2 && Math.abs(ink[0].cy-ink[1].cy) > Math.abs(ink[0].cx-ink[1].cx)*.8) { const [a,b] = [...ink].sort((p,q)=>p.cy-q.cy); eyes = [a]; mouth = [b]; }
+  else if (ink.length >= 3) { const ys = ink.map(e=>e.cy), mid = (Math.min(...ys)+Math.max(...ys))/2; eyes = ink.filter(e=>e.cy < mid); mouth = ink.filter(e=>e.cy >= mid); }
+  probe.removeChild(g);
+  const W = bb.width*s0, H = bb.height*s0, all = pts.flat();
+  const ec = eyes.length ? [eyes.reduce((a,e)=>a+e.cx,0)/eyes.length, eyes.reduce((a,e)=>a+e.cy,0)/eyes.length] : [0, -H*.7];
+  const xs = eyes.map(e=>e.cx), span = eyes.length > 1 ? Math.max(...xs) - Math.min(...xs) : 0;
+  const lr = [...eyes].sort((a,b)=>a.cx-b.cx), angle = eyes.length === 2 ? Math.max(-20, Math.min(20, Math.atan2(lr[1].cy-lr[0].cy, lr[1].cx-lr[0].cx)*180/Math.PI)) : 0;
+  const eyeR = eyes.length ? eyes.reduce((a,e)=>a+e.r,0)/eyes.length : 4;
+  // width of the body around x at height y (nearest outline crossings either side)
+  // the stretch of body crossed by a horizontal line at y: the interval containing x, else the nearest one
+  const spanAt = (y, x) => { const X = [];
+    for (const ring of pts) for (let k=0;k<ring.length;k++){ const a = ring[k], b = ring[(k+1)%ring.length];
+      if ((a[1]-y)*(b[1]-y) <= 0 && a[1] !== b[1]) X.push(a[0] + (b[0]-a[0])*(y-a[1])/(b[1]-a[1])); }
+    X.sort((p,q)=>p-q); let best = null, bd = Infinity;
+    for (let k=0;k+1<X.length;k+=2){ const l = X[k], r = X[k+1], d = x < l ? l-x : x > r ? x-r : 0; if (d < bd) { bd = d; best = [l, r]; } }
+    return best || [x - W*.3, x + W*.3]; };
+  const len = s => s[1] - s[0], mid = s => (s[0] + s[1]) / 2;
+  const headS = spanAt(ec[1], ec[0]), headW = len(headS);
+  // hat: wanted width from the head, then walk down from the top until the body is wide enough to sit it on (skips antennae, tips, ears)
+  const hatW = Math.min(W*.6, clamp(headW*.72, Math.max(18, span*1.6), Math.max(30, span*3.2)));
+  const win = Math.max(span*.8, 8), head = all.filter(p => Math.abs(p[0]-ec[0]) < win), topY = Math.min(...(head.length ? head : all).map(p=>p[1]));
+  let seatY = topY, seat = spanAt(topY + 1, ec[0]);
+  for (let y = topY + 1; y < ec[1] - eyeR*1.6; y += 1) { seat = spanAt(y, ec[0]); seatY = y; if (len(seat) >= hatW*.82) break; }
+  const hat = { at:[clamp(mid(seat), ec[0] - hatW*.3, ec[0] + hatW*.3), seatY + 2], w:Math.min(hatW, len(seat)*1.25) };   // stays over the eyes on long bodies
+  // neck: under the mouth (or well under a lone eye), centred on the body there
+  const mouthBottom = mouth.length ? Math.max(...mouth.map(m=>m.bottom)) : ec[1] + Math.max(eyeR*4, H*.12);
+  const neckY = Math.min(mouthBottom + Math.max(4, eyeR*1.3), -H*.15), neckS = spanAt(neckY, ec[0]);
+  return ANCH[id] = { s0, cx, bot, W, H, eye:ec, span, angle, eyeR, eyeIdx:eyes.map(e=>e.idx), hat, headS, headW, neck:[clamp(mid(neckS), ec[0] - headW*.2, ec[0] + headW*.2), neckY], neckW:len(neckS), side:[W/2 - 4, 0] };
+}
+
+// ---------- attachments: each slot has one anchor + one size rule; every item is drawn 100 wide around its marker m ----------
+// transform = translate(anchor) rotate(eye-line angle) scale(k) translate(-marker)
+const place = (anchor, m, k, ang=0) => `translate(${anchor[0].toFixed(1)} ${anchor[1].toFixed(1)}) rotate(${ang.toFixed(1)}) scale(${k.toFixed(3)}) translate(${-m[0]} ${-m[1]})`;
+const SLOTS = {
+  hat:  { anchor: A => A.hat.at,                           width: A => A.hat.w, tilt:true },
+  eyes: { anchor: A => A.eye, tilt:true },                 // eyewear is drawn per character: one lens per eye, lens size from the eye, not the spacing
+  neck: { anchor: (A, it, k) => [A.neck[0], Math.min(A.neck[1], -2 - it.h*k)], width: (A, it) => clamp(A.neckW*it.fit, 18, 70) },   // lifted if it would hang below the feet
+  prop: { anchor: A => A.side,                              width: () => 80 },
+};
+const ITEMS = {
+  hat: {
+    TopHat: { m:[50,72], svg:`<rect x="24" y="8" width="52" height="58" rx="4" fill="#2b2a33"/><rect x="6" y="62" width="88" height="10" rx="5" fill="#2b2a33"/><rect x="24" y="48" width="52" height="9" fill="#e8494b"/>` },
+    Party:  { m:[50,72], svg:`<path d="M50 4 L84 72 H16 Z" fill="#f78fb3"/><path d="M33 52 H67 M40 32 H60" stroke="#f6c945" stroke-width="6"/><circle cx="50" cy="5" r="8" fill="#f6c945"/>` },
+    Crown:  { m:[50,62], svg:`<path d="M12 62 L6 14 L30 36 L50 6 L70 36 L94 14 L88 62 Z" fill="#f6c945" stroke="#e0a800" stroke-width="3" stroke-linejoin="round"/><circle cx="50" cy="46" r="6" fill="#e8494b"/><circle cx="26" cy="50" r="4" fill="#3a85f2"/><circle cx="74" cy="50" r="4" fill="#3a85f2"/>` },
+    Cap:    { m:[40,62], svg:`<path d="M6 62 Q6 12 40 12 Q74 12 74 62Z" fill="#e8494b"/><path d="M66 56 Q110 52 106 66 H64Z" fill="#c23638"/><circle cx="40" cy="12" r="5" fill="#c23638"/>` },
+    Beanie: { m:[50,64], svg:`<path d="M12 62 Q12 10 50 10 Q88 10 88 62Z" fill="#3a85f2"/><rect x="8" y="52" width="84" height="16" rx="8" fill="#fff"/><circle cx="50" cy="8" r="9" fill="#fff"/>` },
+    Chef:   { m:[50,66], svg:`<path d="M26 66 V42 Q6 42 8 24 Q10 6 30 14 Q40 -2 58 12 Q82 6 90 24 Q94 42 74 42 V66Z" fill="#fff" stroke="#d7d3cc" stroke-width="3" stroke-linejoin="round"/><path d="M26 56 H74" stroke="#d7d3cc" stroke-width="3"/>` },
+  },
+  eyes: {   // draw(A) -> markup around the eye midpoint; lenses sit exactly on the eyes
+    Goggles: { draw: A => lenses(A, 1.25, (x,r) => `<circle cx="${x}" cy="0" r="${r}" fill="#8fd3ff" stroke="#e8494b" stroke-width="${r*.32}"/><path d="M${x-r*.45} ${-r*.35} q${r*.3} ${-r*.3} ${r*.65} ${-r*.2}" stroke="#fff" stroke-width="${r*.18}" stroke-linecap="round" fill="none"/>`, '#e8494b', true) },
+    Shades:  { draw: A => lenses(A, 1.15, (x,r) => `<rect x="${x-r*1.1}" y="${-r*.75}" width="${r*2.2}" height="${r*1.5}" rx="${r*.45}" fill="#2b2a33"/><path d="M${x-r*.6} ${-r*.3} h${r*.5}" stroke="#fff" stroke-width="${r*.15}" stroke-linecap="round" opacity=".6"/>`, '#2b2a33') },
+    Round:   { draw: A => lenses(A, 1.05, (x,r) => `<circle cx="${x}" cy="0" r="${r}" fill="#ffffff55" stroke="#2b2a33" stroke-width="${r*.26}"/>`, '#2b2a33') },
+    Hearts:  { draw: A => lenses(A, 1.2,  (x,r) => `<path transform="translate(${x} ${-r*.15}) scale(${r/18})" d="M0 18 C-30 -2 -16 -22 0 -8 C16 -22 30 -2 0 18Z" fill="#f2679b"/>`, '#f2679b') },
+  },
+  neck: {
+    BowTie:    { fit:.42, h:28, m:[50,14], svg:`<path d="M50 14 L6 0 Q0 14 6 28 Z M50 14 L94 0 Q100 14 94 28 Z" fill="#e8494b"/><circle cx="50" cy="14" r="9" fill="#c23638"/>` },
+    GoldChain: { fit:.72, h:48, m:[50,0],  svg:`<path d="M2 0 Q50 46 98 0" stroke="#f6c945" stroke-width="6" stroke-dasharray="1 8" stroke-linecap="round" fill="none"/><circle cx="50" cy="34" r="13" fill="#f6c945" stroke="#e0a800" stroke-width="3"/><text x="50" y="40" font-size="16" font-weight="800" text-anchor="middle" fill="#b88600">$</text>` },
+    Medal:     { fit:.5,  h:80, m:[50,0],  svg:`<path d="M30 0 L46 46 M70 0 L54 46" stroke="#3a85f2" stroke-width="12" stroke-linecap="round"/><circle cx="50" cy="58" r="20" fill="#f6c945" stroke="#e0a800" stroke-width="4"/><path d="M50 46 l4 8 9 1 -7 6 2 9 -8 -5 -8 5 2 -9 -7 -6 9 -1Z" fill="#e0a800"/>` },
+  },
+  prop: {
+    GoldBar:   { m:[0,0], svg:`<path d="M0 0 H46 L38 -17 H8Z" fill="#f6c945"/><path d="M8 -17 H38 L34 -22 H12Z" fill="#ffe27a"/><path d="M12 -8 H34" stroke="#e0a800" stroke-width="2.5" stroke-linecap="round"/><path d="M44 -30 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2Z" fill="#f6c945"/>` },
+    GoldStack: { m:[0,0], svg:`<g id="gb"><path d="M0 0 H40 L33 -14 H7Z" fill="#f6c945"/><path d="M7 -14 H33 L30 -18 H10Z" fill="#ffe27a"/></g><path d="M44 0 H84 L77 -14 H51Z" fill="#f2bd2c"/><path d="M51 -14 H77 L74 -18 H54Z" fill="#ffe27a"/><path d="M22 -18 H62 L55 -32 H29Z" fill="#f6c945"/><path d="M29 -32 H55 L52 -36 H32Z" fill="#ffe27a"/>` },
+    MoneyBag:  { m:[0,0], svg:`<path d="M6 0 Q-4 -30 18 -40 L14 -48 H38 L34 -40 Q56 -30 46 0Z" fill="#c9a36b"/><path d="M14 -42 H38" stroke="#8a6a3b" stroke-width="3"/><text x="26" y="-11" font-size="20" font-weight="800" text-anchor="middle" fill="#6b8f2e">$</text>` },
+    Coffee:    { m:[0,0], svg:`<path d="M4 -30 H34 L30 0 H8Z" fill="#fff" stroke="#d7d3cc" stroke-width="2"/><path d="M5 -22 H33 L32 -12 H6Z" fill="#c9714e"/><path d="M34 -24 q10 2 0 12" stroke="#d7d3cc" stroke-width="3" fill="none"/><path d="M14 -36 q-3 -5 0 -9 M22 -36 q-3 -5 0 -9" stroke="#c8c4bc" stroke-width="2" fill="none" stroke-linecap="round"/>` },
+  },
+};
+// lens radius follows the eye size (and never lets the two lenses overlap); a bridge joins them, goggles add a strap across the head
+function lenses(A, grow, lens, bridge, strap=false){
+  const half = A.span/2, r = clamp(A.eyeR*2.3*grow, 5, half ? half*.9 : 99), xs = half ? [-half, half] : [0], hw = Math.min(A.headW/2 + 2, half + r*2.4);   // strap wraps the head, not a long body
+  return (strap ? `<path d="M${-hw} 0 H${hw}" stroke="#2b2a33" stroke-width="${r*.4}" stroke-linecap="round"/>` : '')
+       + (half ? `<path d="M${-half+r*.9} 0 H${half-r*.9}" stroke="${bridge}" stroke-width="${r*.26}" stroke-linecap="round"/>` : '')
+       + xs.map(x => lens(x, r)).join('');
+}
+function attachment(slot, name, A){
+  const it = ITEMS[slot][name]; if (!it) return '';
+  const S = SLOTS[slot], ang = S.tilt ? A.angle : 0;
+  if (it.draw) { const at = S.anchor(A); return `<g transform="translate(${at[0].toFixed(1)} ${at[1].toFixed(1)}) rotate(${ang.toFixed(1)})">${it.draw(A)}</g>`; }
+  const k = S.width(A, it)/100;
+  return `<g transform="${place(S.anchor(A, it, k), it.m, k, ang)}">${it.svg}</g>`;
+}
+
+// ---------- gaits: whole-body motion (the legs are part of the drawing) ----------
+// freq cycles/s, speed units/s, jump = hop height, sway = side tilt (deg), lean = forward tilt, squash = landing squash
+const GAITS = {
+  waddle: { freq:1.6, speed:42, jump:3,  sway:9, lean:0, squash:.03 },
+  hop:    { freq:1.4, speed:62, jump:18, sway:0, lean:4, squash:.12 },
+  scoot:  { freq:3.2, speed:58, jump:1.5,sway:2, lean:8, squash:.02 },
+  bounce: { freq:1.1, speed:46, jump:32, sway:0, lean:0, squash:.16 },
+  strut:  { freq:1.2, speed:40, jump:5,  sway:5, lean:-5, squash:.04 },
+  dance:  { freq:1.2, speed:0,  jump:10, sway:13, lean:0, squash:.08 },
+};
+const GAIT_NAMES = Object.keys(GAITS).filter(k => k !== 'dance');
+
+// ---------- state ----------
+const rnd  = n => Math.floor(Math.random() * n), pick = a => a[rnd(a.length)];
+const pickOrNone = o => { const k = Object.keys(o); return k.concat(k.map(()=>''))[rnd(k.length*2)]; };   // like Tabby: ~half the time nothing
+const roll = () => ({ likesPets: Math.random()>.45, hat:pickOrNone(ITEMS.hat), eyes:pickOrNone(ITEMS.eyes), neck:pickOrNone(ITEMS.neck), prop:pickOrNone(ITEMS.prop), gait:pick(GAIT_NAMES) });
+const START = [[9,30],[0,200],[4,700],[12,200],[2,40]];       // [species, xp]
+const XS = [70,210,350,490,630], GROUND = 250;
+const pos = [...XS], dir = [1,1,1,1,1], mode = ['idle','idle','idle','idle','idle'];   // idle | dance | walk | home
+let pets, sel = 0;
+try { pets = JSON.parse(localStorage.critters1); } catch {}
+if (!Array.isArray(pets) || pets.length !== 5) pets = START.map(([species, xp]) => ({ ...roll(), species, xp, form: Growth.traits(xp, SPECIES[species].forms).earned }));
+const save = () => { try { localStorage.critters1 = JSON.stringify(pets); } catch {} };
+
+// ---------- render ----------
+const svg = document.getElementById('svg'), hearts = {}, hover = new Set(), evo = {}, refs = [];
+function petSVG(p, i){
+  const sp = SPECIES[p.species], t = Growth.traits(p.xp, sp.forms, p.form), f = t.form, c = CHARS[f.id], A = analyze(f.id);
+  const ink = c.ink.map((e, k) => A.eyeIdx.includes(k) ? `<g class="eye">${e}</g>` : e).join('');     // eyes wrapped so blinking doesn't fight their translate
+  return `<g class="pet ${p.likesPets?'likes':'hates'} ${evo[i]?'evolving':''}" data-i="${i}" transform="translate(${pos[i]} ${GROUND})">
+    <g class="grow" transform="scale(${t.scale.toFixed(3)})"><g class="pw">
+      <ellipse class="shadow" cx="0" cy="1" rx="${(A.W*.42).toFixed(1)}" ry="4" fill="#000" opacity=".08"/>
+      <g class="body">
+        <g transform="scale(${A.s0}) translate(${-A.cx} ${-A.bot})">${c.skin.join('')}${ink}</g>
+        ${attachment('neck', p.neck, A)}${attachment('eyes', p.eyes, A)}${attachment('hat', p.hat, A)}
+      </g>
+      ${p.prop ? `<g class="prop">${attachment('prop', p.prop, A)}</g>` : ''}
+    </g></g>
+    <text class="label" y="26">${f.name}</text>
+    ${i===sel ? `<path class="sel-mark" d="M-6 40 L6 40 L0 33Z"/>` : ''}
+  </g>`;
+}
+function bindRefs(){ svg.querySelectorAll('.pet').forEach(el => { const i = +el.dataset.i; refs[i] = { el, body:el.querySelector('.body'), shadow:el.querySelector('.shadow'), prop:el.querySelector('.prop') }; }); }
+function xpUI(){
+  const p = pets[sel], t = Growth.traits(p.xp, SPECIES[p.species].forms, p.form);
+  const nx = t.nextForm ? ` · evolves into ${t.nextForm.name} at Lv ${t.nextForm.at} (${t.nextForm.xp} xp)` : ' · final form';
+  document.getElementById('xpinfo').textContent = `Lv ${t.level} · ${Math.floor(t.xp)}/${t.nextLevelXp} xp${nx}`;
+  document.getElementById('xp').value = t.levelFrac;
+}
+function render(){
+  Object.values(hearts).forEach(clearInterval);
+  svg.innerHTML = pets.map(petSVG).join('');
+  bindRefs(); hover.forEach(startHearts);
+  pets.forEach((_,i) => LAST[i] && applyPose(i, LAST[i]));
+  xpUI();
+  const p = pets[sel], opts = (id, vals, cur, none, label = v => v) => document.getElementById(id).innerHTML =
+    (none ? `<option value="">${none}</option>` : '') + vals.map(([v, txt]) => `<option value="${v}" ${String(v)===String(cur)?'selected':''}>${label(txt)}</option>`).join('');
+  document.getElementById('name').textContent = SPECIES[p.species].forms[p.form].name + (p.likesPets ? ' · loves pets' : ' · hates pets');
+  opts('species', SPECIES.map((s,k) => [k, s.name]), p.species);
+  for (const slot of ['hat','eyes','neck','prop']) opts(slot, Object.keys(ITEMS[slot]).map(v => [v, v.replace(/([a-z])([A-Z])/g,'$1 $2')]), p[slot], `no ${slot}`);
+  opts('gait', GAIT_NAMES.map(v => [v, v]), p.gait, '', v => 'walk: ' + v);
+  save();
+}
+
+// ---------- motion: one pose per frame, applied to the whole body (origin = feet, so tilt/squash pivot on the ground) ----------
+const TAU = Math.PI*2, S = Math.sin, C = Math.cos, LAST = [], A_ = pets.map(() => ({ ph:Math.random(), k:0, hop:0 }));
+const hop = i => { A_[i].hop = .6; };
+function pose(i, dt, t){
+  const a = A_[i], p = pets[i], m = mode[i], busy = !!evo[i], dr = dir[i];
+  const moving = !busy && m !== 'idle', g = m === 'dance' ? GAITS.dance : (GAITS[p.gait] || GAITS.waddle);
+  a.k += ((moving?1:0) - a.k) * Math.min(1, dt*8); const k = a.k;
+  if (moving) a.ph += dt*g.freq;
+  const ph = a.ph, hov = hover.has(i) && !busy, step = Math.abs(S(TAU*ph));   // two steps per cycle
+  let by = 0, lean = 0, sx = 1, sy = 1;
+  if (!busy) { const br = S(TAU*t/3 + i); sy += .025*br; sx -= .012*br; }    // breathing
+  by -= g.jump*k*step;
+  const land = Math.pow(1 - step, 6)*k;                                      // squash right at touch-down
+  sy *= 1 - g.squash*land + g.squash*.5*k*step; sx *= 1 + g.squash*land*.8;
+  lean = g.sway*k*S(TAU*ph) + dr*g.lean*k;
+  if (hov && p.likesPets) { const b = S(TAU*2.8*t); sy *= 1 + .07*b; sx *= 1 - .04*b; }
+  if (hov && !p.likesPets) lean += 3*S(t*55);
+  if (a.hop > 0) { const pp = 1 - a.hop/.6, air = S(Math.PI*pp); by -= 26*air; sy *= 1 + .08*air; sx *= 1 - .05*air; a.hop -= dt; }
+  return { by, lean, sx, sy, flip: m === 'walk' || m === 'home' ? dr : 1 };
+}
+function applyPose(i, P){
+  const r = refs[i]; if (!r) return; LAST[i] = P;
+  r.body.setAttribute('transform', `translate(0 ${P.by.toFixed(2)}) rotate(${P.lean.toFixed(2)}) scale(${(P.sx*P.flip).toFixed(3)} ${P.sy.toFixed(3)})`);
+  r.shadow.setAttribute('transform', `scale(${(1 + P.by/90).toFixed(3)} 1)`);   // shadow shrinks while airborne
+  r.prop?.setAttribute('transform', P.flip < 0 ? 'scale(-1 1)' : '');
+}
+
+// ---------- idle + pet actions ----------
+const g = i => svg.querySelector(`.pet[data-i="${i}"]`);
+function blink(i){ const el = g(i); if (el) { el.classList.add('blink'); setTimeout(() => el.classList.remove('blink'), 150); } setTimeout(() => blink(i), 600 + Math.random()*3500); }
+pets.forEach((_,i) => setTimeout(() => blink(i), Math.random()*2000));
+setInterval(() => { const i = rnd(5); if (!hover.has(i) && mode[i]==='idle' && !evo[i]) hop(i); }, 2500);
+function startHearts(i){
+  clearInterval(hearts[i]);
+  if (!pets[i].likesPets) return;
+  hearts[i] = setInterval(() => {
+    addXp(i,'pet');
+    const t = document.createElementNS(NS,'text'); t.textContent = '❤'; t.setAttribute('class','heart');
+    t.setAttribute('x', pos[i]-20+Math.random()*40); t.setAttribute('y', 110+Math.random()*30); svg.append(t); setTimeout(() => t.remove(), 1000);
+  }, 250);
+}
+svg.addEventListener('mouseover', e => { const el = e.target.closest('.pet'); if (!el) return; const i = +el.dataset.i; if (!hover.has(i)) { hover.add(i); startHearts(i); } });
+svg.addEventListener('mouseout',  e => { const el = e.target.closest('.pet'); if (!el || el.contains(e.relatedTarget)) return; const i = +el.dataset.i; hover.delete(i); clearInterval(hearts[i]); });
+svg.addEventListener('click', e => { const el = e.target.closest('.pet'); if (el) { sel = +el.dataset.i; render(); } });
+
+// ---------- growth + evolution ----------
+function float(i, text, cls, y=60){ const t = document.createElementNS(NS,'text'); t.textContent = text; t.setAttribute('class',cls); t.setAttribute('x', pos[i]); t.setAttribute('y', y); svg.append(t); setTimeout(() => t.remove(), 1500); }
+function addXp(i, event, amount=1){
+  const forms = SPECIES[pets[i].species].forms, before = Growth.traits(pets[i].xp, forms, pets[i].form), r = Growth.gain(pets[i].xp, event, amount);
+  pets[i].xp = r.xp; const after = Growth.traits(r.xp, forms, pets[i].form);
+  if (r.leveledUp) { float(i,'LEVEL UP!','lvl'); render(); }
+  else g(i)?.querySelector('.grow')?.setAttribute('transform', `scale(${after.scale.toFixed(3)})`);
+  if (i===sel) xpUI();
+  checkEvolution(i);
+}
+function checkEvolution(i){ const to = Growth.evolutionDue(pets[i].xp, SPECIES[pets[i].species].forms, pets[i].form); if (to >= 0 && !evo[i]) evolve(i, to); }
+// flash the old silhouette ~2s, then swap to the next character in the line with a burst + sparkles (attachments re-fit by themselves)
+function evolve(i, to){
+  const forms = SPECIES[pets[i].species].forms, from = forms[pets[i].form].name;
+  evo[i] = true; mode[i] = 'idle'; render();
+  setTimeout(() => {
+    pets[i].form = to; delete evo[i]; render();
+    g(i)?.classList.add('pop'); setTimeout(() => g(i)?.classList.remove('pop'), 1000);
+    const b = document.createElementNS(NS,'circle'); b.setAttribute('class','burst'); b.setAttribute('cx',pos[i]); b.setAttribute('cy',180); b.setAttribute('r',14); svg.append(b); setTimeout(() => b.remove(), 1000);
+    for (let k=0;k<10;k++){ const ang = k/10*TAU, t = document.createElementNS(NS,'text'); t.textContent = '✦'; t.setAttribute('class','spark');
+      t.setAttribute('x',pos[i]); t.setAttribute('y',170); t.style.setProperty('--dx',C(ang)*90+'px'); t.style.setProperty('--dy',S(ang)*90+'px'); svg.append(t); setTimeout(() => t.remove(), 1200); }
+    float(i, `${from} evolved into ${forms[to].name}!`, 'lvl', 0);
+    checkEvolution(i);
+  }, 2200);
+}
+setInterval(save, 3000);
+document.getElementById('feed').onclick = () => { float(sel,'🍎','heart'); addXp(sel,'feed'); hop(sel); };
+document.getElementById('evolve').onclick = () => { const nx = SPECIES[pets[sel].species].forms[pets[sel].form+1]; if (!nx || evo[sel]) return;
+  pets[sel].xp = Math.max(pets[sel].xp, Math.ceil(Growth.xpForLevel(nx.at))); render(); checkEvolution(sel); };
+
+// ---------- main loop ----------
+const setMode = (i, m) => { if (evo[i]) return; mode[i] = (mode[i]===m ? (m==='walk' ? 'home' : 'idle') : m); };
+let last = performance.now();
+(function tick(now){
+  const dt = Math.min((now-last)/1000, .1), t = now/1000; last = now;
+  for (let i=0;i<5;i++){
+    if (!refs[i]) continue;
+    const m = mode[i];
+    if (m==='dance') addXp(i,'dance',dt);
+    if (m==='walk' || m==='home') {
+      addXp(i,'walk',dt);
+      const sp = (GAITS[pets[i].gait] || GAITS.waddle).speed * Growth.traits(pets[i].xp, SPECIES[pets[i].species].forms, pets[i].form).scale;
+      if (m==='walk') { pos[i] += dir[i]*sp*dt; if (pos[i]>670) { pos[i]=670; dir[i]=-1; } if (pos[i]<30) { pos[i]=30; dir[i]=1; } }
+      else { const d = XS[i]-pos[i]; dir[i] = Math.sign(d)||1; if (Math.abs(d) < sp*dt) { pos[i]=XS[i]; mode[i]='idle'; } else pos[i] += dir[i]*sp*dt; }
+    }
+    refs[i].el.setAttribute('transform', `translate(${pos[i]} ${GROUND})`);
+    applyPose(i, pose(i, dt, t));
+  }
+  requestAnimationFrame(tick);
+})(last);
+const act = () => render();
+document.getElementById('dance').onclick    = () => { if (mode[sel]==='walk') mode[sel]='home'; setMode(sel,'dance'); act(); };
+document.getElementById('run').onclick      = () => { setMode(sel,'walk'); act(); };
+document.getElementById('danceAll').onclick = () => { const on = mode.some(m=>m!=='dance'); mode.forEach((_,i)=>{ mode[i] = evo[i] ? 'idle' : on ? 'dance' : 'idle'; }); act(); };
+document.getElementById('runAll').onclick   = () => { mode.forEach((_,i)=>{ if (!evo[i]) { mode[i]='walk'; dir[i] = i%2 ? -1 : 1; } }); act(); };
+document.getElementById('stop').onclick     = () => { mode.forEach((m,i)=>mode[i] = m==='walk' ? 'home' : 'idle'); act(); };
+
+// ---------- ui ----------
+document.getElementById('roll').onclick    = () => { pets[sel] = { ...pets[sel], ...roll() }; render(); };
+document.getElementById('rollAll').onclick = () => { pets = pets.map(p => ({ ...p, ...roll() })); render(); };
+document.getElementById('species').onchange = e => { const s = +e.target.value; pets[sel] = { ...pets[sel], species:s, form:Growth.traits(pets[sel].xp, SPECIES[s].forms).earned }; render(); };
+for (const k of ['hat','eyes','neck','prop','gait']) document.getElementById(k).onchange = e => { pets[sel][k] = e.target.value; render(); };
+render();
+</script>
+</body>
+</html>

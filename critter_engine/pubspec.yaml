@@ -1,0 +1,23 @@
+name: critter_engine
+description: Renders critters (characters + attachments) from a JSON spec, using the catalog built by ../compiler.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.10.7
+  flutter: ">=3.38.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_svg: ^2.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  vector_graphics_compiler: ^1.3.0
+
+flutter:
+  assets:
+    - assets/critter_catalog.json
