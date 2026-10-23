@@ -154,5 +154,38 @@ const cells = Object.keys(characters).sort().map((id, n) => `<g transform="trans
 }<text y="22" text-anchor="middle" font-family="sans-serif" font-size="11">${id}</text></g>`).join('');
 fs.writeFileSync(path.join(OUT, 'gallery.html'), `<!doctype html><meta charset="utf-8"><title>Catalog gallery</title><body style="margin:0;background:#fbf8f2"><svg viewBox="0 0 1600 1150" width="1600">${cells}</svg>`);
 
+// ---------- evolution sheet: every species line, stage by stage, drawn at its stage size ----------
+{
+  const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const body = id => { const c = characters[id];
+    return c.skin.map(e => `<path d="${e.d}" fill="${e.fill}"${e.fillRule ? ` fill-rule="${e.fillRule}"` : ''}/>`).join('')
+         + c.ink.map(e => e.d ? `<path d="${e.d}" fill="${INK}"${e.fillRule ? ` fill-rule="${e.fillRule}"` : ''}/>` : `<circle cx="${e.cx}" cy="${e.cy}" r="${e.r}" fill="${INK}"/>`).join(''); };
+  const LEFT = 150, CELL = 220, ROW = 190, TOP = 110, cols = Math.max(...species.map(s => s.forms.length));
+  const W = LEFT + cols * CELL + 30, H = TOP + species.length * ROW + 30, font = `font-family="Avenir Next, Futura, Helvetica, sans-serif"`;
+  const rows = species.map((sp, r) => {
+    const y = TOP + r * ROW, base = y + ROW - 50;
+    const cells = sp.forms.map((f, k) => {
+      const x = LEFT + k * CELL + CELL / 2, sc = (f.size[0] + f.size[1]) / 2;
+      const arrow = k ? `<g transform="translate(${x - CELL / 2} ${base - 45})"><path d="M-22 0 H16 M8 -7 L17 0 L8 7" stroke="#b9b2a6" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
+        + `<text y="-12" text-anchor="middle" font-size="11" font-weight="700" fill="#9a9184" ${font}>Lv ${f.atLevel}</text></g>` : '';
+      return `${arrow}<g transform="translate(${x} ${base}) scale(${sc})">${body(f.character)}</g>`
+        + `<ellipse cx="${x}" cy="${base + 2}" rx="${(characters[f.character].width * sc * .42).toFixed(1)}" ry="4" fill="#000" opacity=".07"/>`
+        + `<text x="${x}" y="${base + 24}" text-anchor="middle" font-size="13" font-weight="800" letter-spacing="1.5" fill="#2b2a33" ${font}>${esc(f.name.toUpperCase())}</text>`
+        + `<text x="${x}" y="${base + 40}" text-anchor="middle" font-size="10.5" fill="#9a9184" ${font}>stage ${k + 1} · #${f.character}</text>`;
+    }).join('');
+    return `<rect x="16" y="${y + 6}" width="${W - 32}" height="${ROW - 12}" rx="18" fill="${r % 2 ? '#f4efe6' : '#f8f4ec'}"/>`
+      + `<text x="40" y="${y + ROW / 2 - 4}" font-size="16" font-weight="800" letter-spacing="2" fill="#2b2a33" ${font}>${esc(sp.id.toUpperCase())}</text>`
+      + `<text x="40" y="${y + ROW / 2 + 16}" font-size="11" fill="#9a9184" ${font}>${sp.forms.length} stages</text>${cells}`;
+  }).join('');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`
+    + `<rect width="${W}" height="${H}" fill="#fbf8f2"/>`
+    + `<text x="${W / 2}" y="56" text-anchor="middle" font-size="28" font-weight="800" letter-spacing="6" fill="#2b2a33" ${font}>EVOLUTION STAGES</text>`
+    + `<text x="${W / 2}" y="82" text-anchor="middle" font-size="12" fill="#9a9184" ${font}>${species.length} species · ${Object.keys(characters).length} characters · each stage drawn at its size, arrows show the level it unlocks at</text>`
+    + rows + '</svg>';
+  fs.writeFileSync(path.join(OUT, 'evolution_sheet.svg'), svg);
+  fs.mkdirSync(path.join(HERE, '..', 'docs'), { recursive: true });
+  fs.writeFileSync(path.join(HERE, '..', 'docs', 'evolution_sheet.svg'), svg);
+}
+
 const kb = (fs.statSync(path.join(OUT, 'critter_catalog.json')).size / 1024).toFixed(0);
-console.log(`${Object.keys(characters).length} characters, ${species.length} species, ${Object.values(K).flat().length} items -> out/critter_catalog.json (${kb} KB), out/gallery.html`);
+console.log(`${Object.keys(characters).length} characters, ${species.length} species, ${Object.values(K).flat().length} items -> out/critter_catalog.json (${kb} KB), out/gallery.html, docs/evolution_sheet.svg`);
