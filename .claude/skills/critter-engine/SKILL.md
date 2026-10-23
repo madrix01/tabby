@@ -1,6 +1,6 @@
 ---
 name: critter-engine
-description: Add and use the critter_engine Flutter package (github.com/madrix01/tabby) to render evolving pet critters with hats, eyewear, neck items and props from a JSON spec. Use when installing critter_engine, rendering a CritterView, building or validating critter JSON payloads (species, form, attachments, inline items), defining custom items as JSON, using the glow look (glow, halo, shadow, shading), setting a mood (happy, sad, food, entertainment, travel, shopping), playing the send-money animation between two critters (MoneyTransferView), or adding new characters or items to the catalog.
+description: Add and use the critter_engine Flutter package (github.com/madrix01/tabby) to render evolving pet critters with hats, eyewear, neck items and props from a JSON spec. Use when installing critter_engine, rendering a CritterView, building or validating critter JSON payloads (species, form, attachments, inline items), defining custom items as JSON, using the glow look (glow, halo, shadow, shading), setting a mood (happy, sad, food, entertainment, travel, shopping, empty_wallet), playing the send-money animation between two critters (MoneyTransferView), or adding new characters or items to the catalog.
 ---
 
 # critter_engine
@@ -60,6 +60,7 @@ SizedBox(
 
 - **Sizing:** `CritterView` uses `AspectRatio(4/3)`, so give it a width, or a height via `FittedBox`. Every critter shares the same frame with the feet near the bottom edge, which means a final form draws bigger than a baby one at the same widget size. That's intentional.
 - **Rebuilds:** the widget recomposes only when `spec` changes (specs compare by value), so rebuilding parents is cheap.
+- **Several critters in a row:** give each its own `CritterView` and don't overlap the widgets. Each frame is 300 units wide, about 1.5× the widest final form, which leaves room for side items: the prop on the right, the suitcase or bags on the left, and the empty wallet. On the widest final forms (Longcat, Piggo, Mossy) the left-hand ground items can reach the frame edge, so keep a little padding between views, and don't overlap frames to pack critters tighter. In `v3/index.html` the critters sit 260 units apart for the same reason.
 - **Unknown values:** an unknown `species` renders an empty box. Unknown item ids are skipped and never throw.
 
 ## 4. The JSON spec
@@ -85,7 +86,7 @@ SizedBox(
 | `xp` | Optional. Only grows the critter slightly within its current form. It does **not** change `form`. |
 | `attachments` | One item id per slot: `hat`, `eyes`, `neck`, `prop`. A missing slot means empty. |
 | `behaviour` | Parsed and carried through, but not used for rendering yet (reserved for animation). |
-| `mood` | `happy`, `sad`, `food`, `entertainment`, `travel` or `shopping` (see below). Leave it out for the critter's own face. |
+| `mood` | `happy`, `sad`, `food`, `entertainment`, `travel`, `shopping` or `empty_wallet` (see below). Leave it out for the critter's own face. |
 | `look` | `"flat"` (default) or `"glow"`: shaded glossy bodies, eye glints, a contact shadow and a colour halo. Use it on dark backgrounds. `CritterView(look: CritterLook.glow)` overrides the spec. |
 | `glow` | Optional tuning for the glow look. The defaults are `halo` 0.35 (range 0–1), `blur` 0.8 (0–3), `brightness` 1 (1–2), `shading` 1.5, `gloss` 0.45 and `shadow` 1.5 (each 0–1.5, where 0 = off), and `color` `#rrggbb` to tint the halo. Values are clamped and missing knobs keep their defaults. `CritterView(glow: CritterGlow(...))` overrides it. |
 | `items` | Optional inline item definitions; see section 5. |
@@ -182,11 +183,12 @@ A bad inline item is dropped, with a debug message, and the critter still render
 | `entertainment` | big grin, wears red and blue `three_d` glasses (replacing the spec's eyewear) | popcorn thought bubble |
 | `travel` | soft smile | plane thought bubble, suitcase on the ground |
 | `shopping` | excited open mouth | shopping-bag thought bubble, shopping bags on the ground |
+| `empty_wallet` | frown, worried brows, a tear (sad, no rain cloud) | an open wallet held upside down at its right side, and a red `₹0` thought bubble |
 
 - The mood's mouth replaces the character's own, and works for one-eyed and mouthless characters too.
 - Hats, neck items and props still apply. A ground item from a mood (suitcase, bags) stands on the left, so it doesn't collide with the prop on the right.
-- In code, `spec.copyWith(mood: CritterMood.sad)` sets a mood and `copyWith(clearMood: true)` removes it.
-- Motion such as bouncing, floating notes and falling rain isn't drawn by the package yet; it is static for now. `v3/index.html` shows the animated version.
+- In code, `spec.copyWith(mood: CritterMood.sad)` sets a mood and `copyWith(clearMood: true)` removes it. `empty_wallet` is `CritterMood.emptyWallet` in Dart (`mood.wire` gives the JSON value).
+- Motion such as bouncing, floating notes, falling rain, and the wallet shaking with moths and dust falling out isn't drawn by the package yet; it is static for now. `v3/index.html` shows the animated version.
 
 ## 7. Glow look (halo, shading, shadow)
 

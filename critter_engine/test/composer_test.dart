@@ -129,6 +129,8 @@ void main() {
   group('moods', () {
     test('parsed from json, unknown means none', () {
       expect(CritterSpec.fromJson({'species': 'blip', 'mood': 'travel'}).mood, CritterMood.travel);
+      expect(CritterSpec.fromJson({'species': 'blip', 'mood': 'empty_wallet'}).mood, CritterMood.emptyWallet);
+      expect(const CritterSpec(species: 'blip', mood: CritterMood.emptyWallet).toJson()['mood'], 'empty_wallet');
       expect(CritterSpec.fromJson({'species': 'blip', 'mood': 'grumpy'}).mood, isNull);
       const s = CritterSpec(species: 'blip', mood: CritterMood.sad);
       expect(CritterSpec.fromJson(s.toJson()), s);
@@ -160,6 +162,10 @@ void main() {
       expect(fun.overlay, allOf(contains('#e8494b'), contains('#3a85f2')), reason: 'red + blue lenses');
       expect(fun.overlay, isNot(contains('fill-opacity=".33"')), reason: 'replaces the round glasses');
       expect(compose(catalog, spec.copyWith(mood: CritterMood.shopping))!.prop, contains('#c94d7f'), reason: 'bags');
+      final broke = compose(catalog, spec.copyWith(mood: CritterMood.emptyWallet))!;
+      expect(broke.base, isNot(contains(mouthD)), reason: 'sad mouth instead');
+      expect(broke.prop, allOf(contains('#8a5a3a'), contains('#e8494b')), reason: 'wallet + ₹0 bubble');
+      expect(broke.prop, isNot(contains('#9aa3ad')), reason: 'no rain cloud');
     });
   });
 

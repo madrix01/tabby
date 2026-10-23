@@ -109,12 +109,12 @@ void main() {
   });
 
   testWidgets('moods', (tester) async {
-    tester.view.physicalSize = const Size(1500, 330);
+    tester.view.physicalSize = const Size(1750, 330);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(board(columns: 6, [
+    await tester.pumpWidget(board(columns: 7, [
       for (final (sp, f, mood) in [('blip', 1, 'happy'), ('pinky', 1, 'sad'), ('squidge', 2, 'food'),
-                                   ('pip', 2, 'entertainment'), ('lemon', 1, 'travel'), ('drip', 2, 'shopping')])
+                                   ('pip', 2, 'entertainment'), ('lemon', 1, 'travel'), ('drip', 2, 'shopping'), ('mochi', 1, 'empty_wallet')])
         CritterView(catalog: catalog, spec: CritterSpec.fromJson({'species': sp, 'form': f, 'mood': mood,
             if (mood == 'sad') 'attachments': {'hat': 'beanie'}})),
     ]));

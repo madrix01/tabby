@@ -29,7 +29,7 @@ CritterView(catalog: catalog, spec: CritterSpec.fromJson(payload));
 
 ## Mood
 
-`"mood"` is one of `happy`, `sad`, `food`, `entertainment`, `travel` or `shopping`. Leave it out for the critter's own face; unknown values are ignored.
+`"mood"` is one of `happy`, `sad`, `food`, `entertainment`, `travel`, `shopping` or `empty_wallet`. Leave it out for the critter's own face; unknown values are ignored.
 
 | mood | face | around it |
 |---|---|---|
@@ -39,6 +39,7 @@ CritterView(catalog: catalog, spec: CritterSpec.fromJson(payload));
 | `entertainment` | big grin, wears the `three_d` glasses (replacing any eyewear) | popcorn thought bubble |
 | `travel` | soft smile | plane thought bubble, suitcase on the ground |
 | `shopping` | excited open mouth | shopping-bag thought bubble, shopping bags on the ground |
+| `empty_wallet` | frown, worried brows, a tear | an open wallet held upside down, `₹0` thought bubble (`CritterMood.emptyWallet` in Dart) |
 
 The mood's mouth replaces the character's own. The bubble, cloud and ground item are on the prop layer, so they don't tilt with the body. Motion effects (bouncing, floating notes, falling rain) are in the browser prototype and come to the package with the animation layer.
 

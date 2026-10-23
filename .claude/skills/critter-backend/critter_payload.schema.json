@@ -106,7 +106,8 @@
             "food",
             "entertainment",
             "travel",
-            "shopping"
+            "shopping",
+            "empty_wallet"
           ]
         },
         "look": {

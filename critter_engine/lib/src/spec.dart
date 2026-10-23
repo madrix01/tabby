@@ -54,7 +54,7 @@ class CritterSpec {
   /// Tuning for the glow look; ignored when [look] is flat.
   final CritterGlow glow;
 
-  /// happy / sad / food / entertainment / travel / shopping, or null for the critter's own face.
+  /// happy / sad / food / entertainment / travel / shopping / empty_wallet, or null for the critter's own face.
   final CritterMood? mood;
 
   factory CritterSpec.fromJson(Map<String, dynamic> j) => CritterSpec(
@@ -90,7 +90,7 @@ class CritterSpec {
         if (items.isNotEmpty) 'items': items.map((i) => i.toJson()).toList(),
         if (look != CritterLook.flat) 'look': look.name,
         if (glow != const CritterGlow()) 'glow': glow.toJson(),
-        if (mood != null) 'mood': mood!.name,
+        if (mood != null) 'mood': mood!.wire,
       };
 
   CritterSpec copyWith({String? species, int? form, double? xp, CritterAttachments? attachments, CritterBehaviour? behaviour, List<CritterItem>? items, CritterLook? look, CritterGlow? glow, CritterMood? mood, bool clearMood = false}) =>
