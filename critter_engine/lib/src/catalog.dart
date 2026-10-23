@@ -108,9 +108,12 @@ class CritterCharacter {
 /// Points measured on a character by the compiler, in character space.
 class CritterAnchors {
   const CritterAnchors({
-    required this.eye, required this.eyes, required this.mouthAt, required this.mouthWidth, required this.eyeSpan, required this.eyeAngle, required this.eyeR, required this.headWidth,
+    required this.top, required this.eye, required this.eyes, required this.mouthAt, required this.mouthWidth, required this.eyeSpan, required this.eyeAngle, required this.eyeR, required this.headWidth,
     required this.hatAt, required this.hatWidth, required this.neck, required this.neckWidth, required this.side,
   });
+
+  /// Highest point of the head (antennae, top-knots, floating halos included).
+  final double top;
 
   /// Midpoint between the eyes; [eyeSpan] = distance between them (0 for one-eyed critters).
   final Offset eye;
@@ -137,7 +140,7 @@ class CritterAnchors {
     double d(String k) => (j[k] as num).toDouble();
     final hat = j['hat'] as Map<String, dynamic>;
     return CritterAnchors(
-      eye: o(j['eye']), eyes: [for (final e in j['eyes'] as List) o(e)],
+      top: (j['top'] as num).toDouble(), eye: o(j['eye']), eyes: [for (final e in j['eyes'] as List) o(e)],
       mouthAt: o((j['mouth'] as Map<String, dynamic>)['at']), mouthWidth: ((j['mouth'] as Map<String, dynamic>)['width'] as num).toDouble(),
       eyeSpan: d('eyeSpan'), eyeAngle: d('eyeAngle'), eyeR: d('eyeR'), headWidth: d('headWidth'),
       hatAt: o(hat['at']), hatWidth: (hat['width'] as num).toDouble(), neck: o(j['neck']), neckWidth: d('neckWidth'), side: o(j['side']),

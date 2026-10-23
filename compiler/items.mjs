@@ -74,6 +74,8 @@ export const LINES = [
   [['09','Cactoo'],  ['14','Splotch'],   ['38','Teapot']],
   [['33','Drip'],    ['31','Chick'],     ['26','Ducko']],
   [['40','Lemon'],   ['12','Bunny'],     ['22','Sunny']],
+  [['41','Mochi'],   ['43','Mochiko'],   ['44','Mochimaru']],
+  [['42','Nimbo'],   ['45','Cumulo'],    ['46','Seraphluff']],
 ];
 export const LEVELS = { 2:[1,6], 3:[1,4,8], 4:[1,3,6,10] };
 export const SIZES  = { 2:[.75,1.15], 3:[.7,1,1.3], 4:[.65,.9,1.15,1.35] };

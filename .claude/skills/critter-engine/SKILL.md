@@ -5,7 +5,7 @@ description: Add and use the critter_engine Flutter package (github.com/madrix01
 
 # critter_engine
 
-A Flutter package that draws a "critter" from a JSON spec. A critter is one of 40 flat-colour characters, at some stage of its evolution line, optionally wearing a hat, eyewear and a neck item, and holding a prop. All character geometry is precomputed in a bundled catalog, so the app only composes SVG and never measures anything.
+A Flutter package that draws a "critter" from a JSON spec. A critter is one of 46 flat-colour characters, at some stage of its evolution line, optionally wearing a hat, eyewear and a neck item, and holding a prop. All character geometry is precomputed in a bundled catalog, so the app only composes SVG and never measures anything.
 
 Repo layout (github.com/madrix01/tabby):
 - `critter_engine/`: the Flutter package. This is what apps depend on.
@@ -109,6 +109,8 @@ Missing fields get defaults, and unknown ids are ignored. Values of the wrong ty
 | cactoo | Cactoo → Splotch → Teapot | 1, 4, 8 |
 | drip | Drip → Chick → Ducko | 1, 4, 8 |
 | lemon | Lemon → Bunny → Sunny | 1, 4, 8 |
+| mochi | Mochi → Mochiko → Mochimaru | 1, 4, 8 |
+| nimbo | Nimbo → Cumulo → Seraphluff | 1, 4, 8 |
 
 To derive `form` from xp on the client instead, use the exported curve. A form is unlocked once `levelOf(xp) >= form.atLevel`:
 ```dart

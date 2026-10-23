@@ -10,7 +10,8 @@ void main() {
   final catalog = loadCatalog();
 
   test('catalog has every character placed in a species line', () {
-    expect(catalog.characters, hasLength(40));
+    expect(catalog.characters, hasLength(46));
+    expect(catalog.species, hasLength(16));
     final used = catalog.species.values.expand((s) => s.forms.map((f) => f.character)).toSet();
     expect(used, catalog.characters.keys.toSet());
   });
@@ -33,7 +34,7 @@ void main() {
         }
       }
     }
-    expect(checked, 40 * 13);
+    expect(checked, catalog.characters.length * 13);
   });
 
   test('every species x form x item composes and parses cleanly in flutter_svg\'s parser', () {
@@ -52,7 +53,7 @@ void main() {
         }
       }
     }
-    expect(count, 40 * CritterItem.slots.map((s) => catalog.itemIds(s).length).reduce((a, b) => a + b));
+    expect(count, catalog.characters.length * CritterItem.slots.map((s) => catalog.itemIds(s).length).reduce((a, b) => a + b));
   });
 
   test('glow look: every species x form composes, parses and only adds lighting', () {

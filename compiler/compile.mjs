@@ -55,11 +55,16 @@ function analyze(c){
   const lr = [...eyes].sort((a, b) => a.cx - b.cx), angle = eyes.length === 2 ? clamp(Math.atan2(lr[1].cy - lr[0].cy, lr[1].cx - lr[0].cx) * 180 / Math.PI, -20, 20) : 0;
   const eyeR = eyes.length ? eyes.reduce((a, e) => a + e.r, 0) / eyes.length : 4;
   // the stretch of body crossed by a horizontal line at y: the interval containing x, else the nearest one
-  const spanAt = (y, x) => { const X = [];
-    for (const ring of pts) for (let k = 0; k < ring.length; k++) { const a = ring[k], b = ring[(k + 1) % ring.length];
-      if ((a[1] - y) * (b[1] - y) <= 0 && a[1] !== b[1]) X.push(a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1])); }
-    X.sort((p, q) => p - q); let best = null, bd = Infinity;
-    for (let k = 0; k + 1 < X.length; k += 2) { const l = X[k], r = X[k + 1], d = x < l ? l - x : x > r ? x - r : 0; if (d < bd) { bd = d; best = [l, r]; } }
+  // per part, then merged: overlapping parts (top-knots, wings, two-tone bodies) widen the body instead of splitting it
+  const spanAt = (y, x) => { const iv = [];
+    for (const ring of pts) { const X = [];
+      for (let k = 0; k < ring.length; k++) { const a = ring[k], b = ring[(k + 1) % ring.length];
+        if ((a[1] - y) * (b[1] - y) <= 0 && a[1] !== b[1]) X.push(a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1])); }
+      X.sort((p, q) => p - q); for (let k = 0; k + 1 < X.length; k += 2) iv.push([X[k], X[k + 1]]); }
+    iv.sort((p, q) => p[0] - q[0]); const merged = [];
+    for (const v of iv) { const m = merged[merged.length - 1]; if (m && v[0] <= m[1]) m[1] = Math.max(m[1], v[1]); else merged.push([...v]); }
+    let best = null, bd = Infinity;
+    for (const [l, r] of merged) { const d = x < l ? l - x : x > r ? x - r : 0; if (d < bd) { bd = d; best = [l, r]; } }
     return best || [x - W * .3, x + W * .3]; };
   const len = s => s[1] - s[0], mid = s => (s[0] + s[1]) / 2;
   const headW = len(spanAt(ec[1], ec[0]));
@@ -67,7 +72,9 @@ function analyze(c){
   const hatW = Math.min(W * .6, clamp(headW * .72, Math.max(18, span * 1.6), Math.max(30, span * 3.2)));
   const win = Math.max(span * .8, 8), head = all.filter(p => Math.abs(p[0] - ec[0]) < win), topY = Math.min(...(head.length ? head : all).map(p => p[1]));
   let seatY = topY, seat = spanAt(topY + 1, ec[0]);
-  for (let y = topY + 1; y < ec[1] - eyeR * 1.6; y += 1) { seat = spanAt(y, ec[0]); seatY = y; if (len(seat) >= hatW * .82) break; }
+  for (let y = topY + 1; y < ec[1] - eyeR * 1.6; y += 1) {
+    const sp = spanAt(y, ec[0]); if (sp[0] > ec[0] + 2 || sp[1] < ec[0] - 2) continue;   // only real body under the eyes (not gaps under a floating halo)
+    seat = sp; seatY = y; if (len(seat) >= hatW * .82) break; }
   const hat = { at: [clamp(mid(seat), ec[0] - hatW * .3, ec[0] + hatW * .3), seatY + 2], w: Math.min(hatW, len(seat) * 1.25) };
   // neck: under the mouth (or well under a lone eye), centred on the body there
   const mouthBottom = mouth.length ? Math.max(...mouth.map(m => m.bottom)) : ec[1] + Math.max(eyeR * 4, H * .12);
@@ -75,7 +82,7 @@ function analyze(c){
   // mouth (moods draw their own here); characters without one get a spot under the eye
   const mouthC = mouth.length ? [mouth.reduce((a, m) => a + m.cx, 0) / mouth.length, mouth.reduce((a, m) => a + m.cy, 0) / mouth.length] : [ec[0], ec[1] + Math.max(eyeR * 3.2, 9)];
   const mouthW = mouth.length ? Math.max(...mouth.map(m => m.w)) : Math.max(span * .5, 10);
-  return { s0, cx, bot, W, H, eye: ec, eyes: eyes.map(e => [e.cx, e.cy]), span, angle, eyeR, eyeIdx: eyes.map(e => e.idx), mouthIdx: mouth.map(m => m.idx), mouthC, mouthW, hat, headW,
+  return { s0, cx, bot, W, H, eye: ec, eyes: eyes.map(e => [e.cx, e.cy]), span, angle, eyeR, eyeIdx: eyes.map(e => e.idx), mouthIdx: mouth.map(m => m.idx), mouthC, mouthW, topY, hat, headW,
            neck: [clamp(mid(neckS), ec[0] - headW * .2, ec[0] + headW * .2), neckY], neckW: len(neckS), side: [W / 2 - 4, 0] };
 }
 
@@ -111,7 +118,7 @@ for (const file of files) {
       ...(e.tag === 'path' ? { d: norm(e) } : { cx: r2((e.cx - A.cx) * A.s0), cy: r2((e.cy - A.bot) * A.s0), r: r2(e.r * A.s0) }),
       ...(e.rule ? { fillRule: e.rule } : {}), eye: A.eyeIdx.includes(k), mouth: A.mouthIdx.includes(k) })),
     // everything the engine needs to place any item, including ones it only receives at runtime
-    anchors: { eye: A.eye.map(r2), eyes: A.eyes.map(p => p.map(r2)), mouth: { at: A.mouthC.map(r2), width: r2(A.mouthW) }, eyeSpan: r2(A.span), eyeAngle: r2(A.angle), eyeR: r2(A.eyeR), headWidth: r2(A.headW),
+    anchors: { eye: A.eye.map(r2), eyes: A.eyes.map(p => p.map(r2)), mouth: { at: A.mouthC.map(r2), width: r2(A.mouthW) }, top: r2(A.topY), eyeSpan: r2(A.span), eyeAngle: r2(A.angle), eyeR: r2(A.eyeR), headWidth: r2(A.headW),
                hat: { at: A.hat.at.map(r2), width: r2(A.hat.w) }, neck: A.neck.map(r2), neckWidth: r2(A.neckW), side: A.side.map(r2) },
     attach: attachments(A),   // pre-computed placements of the bundled items: used by the gallery and as a parity oracle for the engine's maths
   };
@@ -187,5 +194,73 @@ fs.writeFileSync(path.join(OUT, 'gallery.html'), `<!doctype html><meta charset="
   fs.writeFileSync(path.join(HERE, '..', 'docs', 'evolution_sheet.svg'), svg);
 }
 
+// ---------- JSON Schema for backends: every payload the app accepts, with slugs from this catalog ----------
+{
+  const color = { type: 'string', pattern: '^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$' };
+  const svgFrag = { type: 'string', minLength: 1, maxLength: 50000,
+    description: 'Shapes only: path, circle, ellipse, rect, polygon, polyline, line, g. Must not contain href, url(, style, <!, <?, javascript:. Use presentation attributes (fill="#…") not style. Draw text as paths.' };
+  const ids = slot => Object.keys({ hat: HATS, neck: NECK, prop: PROPS, eyes: EYEWEAR }[slot]);
+  const slotRef = slot => ({ type: 'string', minLength: 1, description: `Bundled ${slot} ids: ${ids(slot).join(', ')}. Any other id must be defined in the spec's "items" (or registered with registerItems).`, examples: ids(slot) });
+  const num = (min, max, def, description) => ({ type: 'number', minimum: min, maximum: max, default: def, description });
+  const schema = {
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $id: 'https://github.com/madrix01/tabby/critter_payload.schema.json',
+    title: 'Critter payloads (generated by compiler/compile.mjs; do not edit by hand)',
+    catalogVersion: VERSION,
+    $defs: {
+      species: { enum: species.map(s => s.id) },
+      critterSpec: {
+        type: 'object', required: ['species'],
+        properties: {
+          v: { const: 1 },
+          species: { $ref: '#/$defs/species' },
+          form: { type: 'integer', minimum: 0, default: 0, description: 'Evolution stage index within the species line.' },
+          xp: { type: 'number', minimum: 0, description: 'Optional. Only grows the critter inside its current form; does not change form.' },
+          attachments: { type: 'object', additionalProperties: false,
+            properties: { hat: slotRef('hat'), eyes: slotRef('eyes'), neck: slotRef('neck'), prop: slotRef('prop') } },
+          mood: { enum: ['happy', 'sad', 'food', 'entertainment', 'travel', 'shopping'] },
+          look: { enum: ['flat', 'glow'], default: 'flat' },
+          glow: { type: 'object', additionalProperties: false, properties: {
+            halo: num(0, 1, .35, 'Halo opacity'), blur: num(0, 3, .8, 'Halo size'), brightness: num(1, 2, 1, 'Halo brightness (ignored with color)'),
+            shading: num(0, 1.5, 1.5, 'Body shading'), gloss: num(0, 1.5, .45, 'Highlight + eye glints'), shadow: num(0, 1.5, 1.5, 'Contact shadow'),
+            color: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$', description: 'Tint the halo one colour' } } },
+          behaviour: { type: 'object', properties: {
+            likesPets: { type: 'boolean', default: true }, gait: { type: 'string', default: 'waddle' }, state: { type: 'string', default: 'idle' } },
+            description: 'Reserved for the animation layer; carried through but not rendered yet.' },
+          items: { type: 'array', items: { $ref: '#/$defs/item' } },
+        },
+        // form must exist in the species' line
+        allOf: species.map(sp => ({ if: { properties: { species: { const: sp.id } }, required: ['species'] },
+          then: { properties: { form: { maximum: sp.forms.length - 1 } } } })),
+      },
+      item: {
+        type: 'object', required: ['id', 'slot'],
+        properties: { id: { type: 'string', minLength: 1 }, slot: { enum: ['hat', 'eyes', 'neck', 'prop'] } },
+        oneOf: [
+          { properties: { slot: { enum: ['hat', 'neck', 'prop'] }, svg: svgFrag,
+              anchor: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: '[x, y] in the item drawing that lands on the character' },
+              fit: num(.05, 2, .5, 'neck only: width as a fraction of the neck'), height: num(1, 400, 40, 'neck only: drawn height') },
+            required: ['svg', 'anchor'] },
+          { properties: { slot: { const: 'eyes' }, lens: svgFrag, lensRight: svgFrag,
+              grow: num(.3, 3, 1.15, 'Lens size vs eye'), bridge: color, strap: color }, required: ['lens'] },
+        ],
+      },
+      moneyTransfer: {
+        type: 'object', required: ['amount', 'from', 'to'],
+        properties: {
+          amount: { type: 'number', exclusiveMinimum: 0, description: 'Rupees; shown with Indian digit grouping' },
+          currencySymbol: { type: 'string', default: '₹' },
+          from: { $ref: '#/$defs/critterSpec' }, to: { $ref: '#/$defs/critterSpec' },
+        },
+      },
+      itemList: { type: 'array', items: { $ref: '#/$defs/item' }, description: 'For CritterCatalog.registerItems (an item store sent once).' },
+    },
+    $ref: '#/$defs/critterSpec',
+  };
+  const dir = path.join(HERE, '..', '.claude', 'skills', 'critter-backend');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'critter_payload.schema.json'), JSON.stringify(schema, null, 2) + '\n');
+}
+
 const kb = (fs.statSync(path.join(OUT, 'critter_catalog.json')).size / 1024).toFixed(0);
-console.log(`${Object.keys(characters).length} characters, ${species.length} species, ${Object.values(K).flat().length} items -> out/critter_catalog.json (${kb} KB), out/gallery.html, docs/evolution_sheet.svg`);
+console.log(`${Object.keys(characters).length} characters, ${species.length} species, ${Object.values(K).flat().length} items -> out/critter_catalog.json (${kb} KB), out/gallery.html, docs/evolution_sheet.svg, .claude/skills/critter-backend/critter_payload.schema.json`);

@@ -29,7 +29,7 @@ void main() {
         ),
       );
 
-  testWidgets('gallery: all 40 characters with bundled items', (tester) async {
+  testWidgets('gallery: every character with bundled items', (tester) async {
     tester.view.physicalSize = const Size(1600, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);

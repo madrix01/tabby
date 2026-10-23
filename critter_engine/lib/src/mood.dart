@@ -92,7 +92,8 @@ String moodFace(MoodStyle m, CritterAnchors a) {
 /// Where the bubble and cloud sit (character space). [hatWorn] lifts the cloud clear of a hat.
 ({Offset bubble, Offset cloud}) moodSpots(CritterCharacter c, {required bool hatWorn}) {
   final a = c.anchors, lift = hatWorn ? a.hatWidth * .7 : 0.0;
-  return (bubble: Offset(c.width * .42 + 12, a.hatAt.dy - 12), cloud: Offset(a.eye.dx, a.hatAt.dy - 34 - lift));
+  final head = math.min(a.hatAt.dy, a.top + 6); // above top-knots and antennae too, not just the hat seat
+  return (bubble: Offset(c.width * .42 + 12, a.hatAt.dy - 12), cloud: Offset(a.eye.dx, head - 34 - lift));
 }
 
 /// Thought bubble, rain cloud and ground item in character space. They don't tilt with the body.
